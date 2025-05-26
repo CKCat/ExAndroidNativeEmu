@@ -1,43 +1,36 @@
+from ..constant_values import JAVA_NULL
 from ..java_class_def import JavaClassDef
-from ..java_field_def import JavaFieldDef
-from ..java_method_def import java_method_def,JavaMethodDef
-from ..constant_values import *
+from ..java_method_def import java_method_def
 
 
-class List(metaclass=JavaClassDef, jvm_name='java/util/List'):
+class List(metaclass=JavaClassDef, jvm_name="java/util/List"):
     def __init__(self, pylist):
         self.__pylist = pylist
-    #
 
     def __len__(self):
         return len(self.__pylist)
-    #
 
-    def __getitem__(self,index):
+    def __getitem__(self, index):
         return self.__pylist[index]
-    #
 
-    def __setitem__(self,index,value):
+    def __setitem__(self, index, value):
         self.__pylist[index] = value
-    #
 
-    @java_method_def(name='get', args_list=["jint"], signature='(I)Ljava/lang/Object;', native=False)
+    @java_method_def(
+        name="get",
+        args_list=["jint"],
+        signature="(I)Ljava/lang/Object;",
+        native=False,
+    )
     def get(self, emu, index):
-        if (index < len(self.__pylist)):
+        if index < len(self.__pylist):
             return self.__pylist[index]
         return JAVA_NULL
-    #
 
-
-    @java_method_def(name='size', signature='()I', native=False)
+    @java_method_def(name="size", signature="()I", native=False)
     def size(self, emu):
         return len(self.__pylist)
-    #
 
-
-    @java_method_def(name='isEmpty', signature='()Z', native=False)
+    @java_method_def(name="isEmpty", signature="()Z", native=False)
     def isEmpty(self, emu):
         return len(self.__pylist) == 0
-    #
-#
-

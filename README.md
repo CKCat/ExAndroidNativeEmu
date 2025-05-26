@@ -3,24 +3,26 @@
 This is a personal improved version of [AndroidNativeEmu](https://github.com/AeonLucid/AndroidNativeEmu).Allow running android elf code on pc.
 
 ## Improvment compare with AndroidNativeEmu
- - Rewrite memory mapping module, fully support jemalloc
- - More debug utils, pretty printing for instruction and memory.
- - Some misc bug fix
- - Stop all runing when getting exception  instead of just skiping one emulator runing for easily bug detecting...
- - Auto Load dependency so.
- - Auto generate /proc/\[pid\]/maps according to current memory map
- - Fix R_ARM_ABS32 relocation bug.
- - Use program header to load so instead of section header
- - Support Java reflection
- - Support Arm64
- - Support multi-threaded like pthread_create etc.
- - Add Function hook feature
- 
+
+- Rewrite memory mapping module, fully support jemalloc
+- More debug utils, pretty printing for instruction and memory.
+- Some misc bug fix
+- Stop all runing when getting exception instead of just skiping one emulator runing for easily bug detecting...
+- Auto Load dependency so.
+- Auto generate `/proc/[pid]/maps` according to current memory map
+- Fix R_ARM_ABS32 relocation bug.
+- Use program header to load so instead of section header
+- Support Java reflection
+- Support Arm64
+- Support multi-threaded like pthread_create etc.
+- Add Function hook feature
+
 ## TODO
- - ~~Simulate linker TLS initialization.~~
- - ~~Support well known virtual file like /proc/self/maps...~~
- - ~~Get rid of dependency on Section Header when loading ELF~~.
- 
+
+- ~~Simulate linker TLS initialization.~~
+- ~~Support well known virtual file like /proc/self/maps...~~
+- ~~Get rid of dependency on Section Header when loading ELF~~.
+
 ## Usage
 
 > In the future this will be possible through pypi.
@@ -31,13 +33,12 @@ Make sure you are using python 3.7 above.
 2. Run `pip install -r requirements.txt`
 3. Run `python example_jni.py`
 
-
 ## Dependencies
 
 - [Unicorn CPU emulator framework](https://github.com/unicorn-engine/unicorn)
 
-
 ### Text sources
+
 - https://greek0.net/elf.html
 - https://stackoverflow.com/questions/13908276/loading-elf-file-in-c-in-user-space
 - https://programtalk.com/python-examples/pyelftools.elftools.elf.relocation.Relocation/
@@ -47,9 +48,11 @@ Make sure you are using python 3.7 above.
 - https://android.googlesource.com/platform/dalvik/+/donut-release/vm/Jni.c
 
 ### Code sources
+
 - https://github.com/lunixbochs/usercorn
 - https://github.com/slick1015/pad_unpacker (SVC 0 instruction)
 - https://github.com/AeonLucid/AndroidNativeEmu
 
 ### Disclaimer
+
 - This Project is just for personal educational purposed only.You can modify it for your personal used.But we do not take any resonsibility for issues caused by any modification of this project.
