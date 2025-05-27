@@ -768,7 +768,7 @@ class JNIEnv:
     def ensure_local_capacity(self, mu, env):
         # raise NotImplementedError()
         # ignore
-        return JNIEnv.JNI_OK
+        return JNI_OK
 
     @native_method
     def alloc_object(self, mu, env):
