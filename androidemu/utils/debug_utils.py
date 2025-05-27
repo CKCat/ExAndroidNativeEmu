@@ -2,6 +2,7 @@ import io
 import os
 
 import capstone
+from loguru import logger
 from unicorn.arm64_const import (
     UC_ARM64_REG_PC,
     UC_ARM64_REG_SP,
@@ -42,7 +43,7 @@ from unicorn.arm_const import (
 
 from androidemu.emulator import Emulator
 
-from ..const import emu_const
+from ..const import emu_const, map_reg
 
 
 def dump_memory(emu, fd, min_addr=0, max_addr=0xFFFFFFFF):
@@ -60,21 +61,15 @@ def dump_memory(emu, fd, min_addr=0, max_addr=0xFFFFFFFF):
         for addr in range(r[0], r[1] + 1):
             if addr < min_addr or addr > max_addr:
                 continue
-            #
+
             if offset % line_connt == 0:
                 fd.write("0x%08X: " % offset)
-            #
+
             b = mu.mem_read(addr, 1).hex().upper()
             fd.write(" %s" % b)
             offset = offset + 1
             if offset % line_connt == 0:
                 fd.write("\n")
-            #
-        #
-    #
-
-
-#
 
 
 def dump_registers(emu, fd):
@@ -199,6 +194,7 @@ def dump_code(
     emu: Emulator, address: int, size: int, fd: int, dump_reg_type=DUMP_REG_READ
 ):
     mu = emu.mu
+    uc_regs = map_reg.arm_reg_map
     if emu.get_arch() == emu_const.ARCH_ARM32:
         # 判断是否 arm，用不同的 decoder
         cpsr = mu.reg_read(UC_ARM_REG_CPSR)
@@ -209,6 +205,7 @@ def dump_code(
     else:
         # arm64
         md = g_md_arm64
+        uc_regs = map_reg.arm64_reg_map
 
     instruction = mu.mem_read(address, size)
     codes = md.disasm(instruction, address)
@@ -251,7 +248,13 @@ def dump_code(
 
         regs_io = io.StringIO()
         for rid in regs_dump:
-            reg_str = "%s=0x%08X " % (i.reg_name(rid).upper(), mu.reg_read(rid))
+            reg_name = i.reg_name(rid).lower()
+            reg_value = uc_regs.get(reg_name, 0)
+            if reg_value == 0:
+                logger.warning(f"unknown register {reg_name}.")
+                continue
+            reg_value = mu.reg_read(reg_value)
+            reg_str = f"{reg_name}=0x{reg_value:08X} "
             regs_io.write(reg_str)
 
         regs = regs_io.getvalue()
