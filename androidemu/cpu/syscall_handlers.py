@@ -27,13 +27,15 @@ class SyscallHandlers:
         self.__sch = schduler
         self.__interrupt_handler = InterruptHandler(mu)  # 中断处理器
         if arch == emu_const.ARCH_ARM32:
-            # 设置系统调用处理函数
+            # arm32 设置系统调用处理函数
             self.__interrupt_handler.set_handler(2, self._handle_syscall)
         else:
             # arm64
             self.__interrupt_handler.set_handler(2, self._handle_syscall64)
 
-    def set_handler(self, nr: int, name: str, arg_count: int, callback: callable):
+    def set_handler(
+        self, nr: int, name: str, arg_count: int, callback: callable
+    ):
         """设置系统调用处理函数
 
         Args:
@@ -50,7 +52,8 @@ class SyscallHandlers:
         tid = self.__sch.get_current_tid()
         logger.debug(f"{tid} syscall {nr} lr=0x{lr:08X}")
         args = [
-            mu.reg_read(reg_idx) for reg_idx in range(UC_ARM_REG_R0, UC_ARM_REG_R6 + 1)
+            mu.reg_read(reg_idx)
+            for reg_idx in range(UC_ARM_REG_R0, UC_ARM_REG_R6 + 1)
         ]
 
         args_formatted = ", ".join([f"0x{arg}08X" for arg in args])
@@ -72,7 +75,8 @@ class SyscallHandlers:
             if result is not None:
                 mu.reg_write(UC_ARM_REG_R0, result)
         else:
-            error = f"{tid} Unhandled syscall 0x{nr:x} ({nr}) at 0x{mu.reg_read(UC_ARM_REG_PC):x}, args({args_formatted}) stopping emulation"
+            pc = mu.reg_read(UC_ARM_REG_PC)
+            error = f"{tid} Unhandled syscall {nr} at 0x{pc:08X}, args({args_formatted}) stopping emulation"
 
             logger.exception(error)
             mu.emu_stop()
@@ -83,7 +87,7 @@ class SyscallHandlers:
         lr = mu.reg_read(UC_ARM64_REG_LR)
         tid = self.__sch.get_current_tid()
 
-        logger.debug("%d syscall %d lr=0x%016X", tid, idx, lr)
+        logger.debug(f"{tid} syscall {idx} lr=0x{lr}%016X")
         args = [
             mu.reg_read(reg_idx)
             for reg_idx in range(UC_ARM64_REG_X0, UC_ARM64_REG_X6 + 1)
@@ -93,16 +97,15 @@ class SyscallHandlers:
             handler = self._handlers[idx]
             args = args[: handler.arg_count]
             args_formatted = ", ".join(["0x%016X" % arg for arg in args])
+            pc = mu.reg_read(UC_ARM64_REG_PC)
             logger.debug(
-                "%d Executing syscall %s(%s) at 0x%016X"
-                % (tid, handler.name, args_formatted, mu.reg_read(UC_ARM64_REG_PC))
+                f"{tid} Executing syscall {handler.name}({args_formatted}) at {pc:016X}"
             )
             try:
                 result = handler.callback(mu, *args)
             except:
                 logger.exception(
-                    "%d An error occured during in %x syscall hander, stopping emulation"
-                    % (tid, idx)
+                    f"{tid} An error occured during in {idx} syscall hander, stopping emulation"
                 )
                 mu.emu_stop()
                 raise
@@ -111,10 +114,8 @@ class SyscallHandlers:
                 mu.reg_write(UC_ARM64_REG_X0, result)
         else:
             args_formatted = ", ".join(["0x%016X" % arg for arg in args])
-            error = (
-                "%d Unhandled syscall 0x%x (%u) at 0x%x, args(%s) stopping emulation"
-                % (tid, idx, idx, mu.reg_read(UC_ARM64_REG_PC), args_formatted)
-            )
+            pc = mu.reg_read(UC_ARM64_REG_PC)
+            error = "{tid} Unhandled syscall {idx} at 0x{pc:016X}, args({args_formatted}) stopping emulation"
 
             logger.exception(error)
             mu.emu_stop()

@@ -359,7 +359,7 @@ class Modules:
 
         so_needed = reader.get_so_need()
         ld_library_path = self.__get_ld_library_path()
-        logger.debug()
+        logger.debug(ld_library_path)
         for so_name in so_needed:
             path = self.find_so_on_disk(so_name)
             if path is None:

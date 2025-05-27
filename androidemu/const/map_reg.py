@@ -1,4 +1,4 @@
-from unicorn.arm_const import (
+from unicorn.arm64_const import (
     UC_ARM64_REG_B0,
     UC_ARM64_REG_B1,
     UC_ARM64_REG_B2,
@@ -64,6 +64,7 @@ from unicorn.arm_const import (
     UC_ARM64_REG_D29,
     UC_ARM64_REG_D30,
     UC_ARM64_REG_D31,
+    UC_ARM64_REG_FP,
     UC_ARM64_REG_H0,
     UC_ARM64_REG_H1,
     UC_ARM64_REG_H2,
@@ -228,6 +229,7 @@ from unicorn.arm_const import (
     UC_ARM64_REG_W28,
     UC_ARM64_REG_W29,
     UC_ARM64_REG_W30,
+    UC_ARM64_REG_WZR,
     UC_ARM64_REG_X0,
     UC_ARM64_REG_X1,
     UC_ARM64_REG_X2,
@@ -259,6 +261,9 @@ from unicorn.arm_const import (
     UC_ARM64_REG_X28,
     UC_ARM64_REG_X29,
     UC_ARM64_REG_X30,
+    UC_ARM64_REG_XZR,
+)
+from unicorn.arm_const import (
     UC_ARM_REG_C1_C0_2,
     UC_ARM_REG_C13_C0_3,
     UC_ARM_REG_CPSR,
@@ -383,9 +388,6 @@ arm_reg_map = {
     "c1_c0_2": UC_ARM_REG_C1_C0_2,
     "c13_c0_3": UC_ARM_REG_C13_C0_3,
     "fpexc": UC_ARM_REG_FPEXC,
-}
-
-arm_reg_vfp = {
     "d0": UC_ARM_REG_D0,
     "d1": UC_ARM_REG_D1,
     "d2": UC_ARM_REG_D2,
@@ -419,9 +421,6 @@ arm_reg_vfp = {
     "d30": UC_ARM_REG_D30,
     "d31": UC_ARM_REG_D31,
     "fpscr": UC_ARM_REG_FPSCR,
-}
-
-arm_reg_map_q = {
     "q0": UC_ARM_REG_Q0,
     "q1": UC_ARM_REG_Q1,
     "q2": UC_ARM_REG_Q2,
@@ -438,9 +437,6 @@ arm_reg_map_q = {
     "q13": UC_ARM_REG_Q13,
     "q14": UC_ARM_REG_Q14,
     "q15": UC_ARM_REG_Q15,
-}
-
-arm_reg_map_s = {
     "s0": UC_ARM_REG_S0,
     "s1": UC_ARM_REG_S1,
     "s2": UC_ARM_REG_S2,
@@ -474,6 +470,7 @@ arm_reg_map_s = {
     "s30": UC_ARM_REG_S30,
     "s31": UC_ARM_REG_S31,
 }
+
 
 arm64_reg_map = {
     "x0": UC_ARM64_REG_X0,
@@ -513,9 +510,6 @@ arm64_reg_map = {
     "cpacr_el1": UC_ARM64_REG_CPACR_EL1,
     "tpidr_el0": UC_ARM64_REG_TPIDR_EL0,
     "pstate": UC_ARM64_REG_PSTATE,
-}
-
-arm64_reg_map_b = {
     "b0": UC_ARM64_REG_B0,
     "b1": UC_ARM64_REG_B1,
     "b2": UC_ARM64_REG_B2,
@@ -548,9 +542,6 @@ arm64_reg_map_b = {
     "b29": UC_ARM64_REG_B29,
     "b30": UC_ARM64_REG_B30,
     "b31": UC_ARM64_REG_B31,
-}
-
-arm64_reg_map_d = {
     "d0": UC_ARM64_REG_D0,
     "d1": UC_ARM64_REG_D1,
     "d2": UC_ARM64_REG_D2,
@@ -583,9 +574,6 @@ arm64_reg_map_d = {
     "d29": UC_ARM64_REG_D29,
     "d30": UC_ARM64_REG_D30,
     "d31": UC_ARM64_REG_D31,
-}
-
-arm64_reg_map_h = {
     "h0": UC_ARM64_REG_H0,
     "h1": UC_ARM64_REG_H1,
     "h2": UC_ARM64_REG_H2,
@@ -618,9 +606,6 @@ arm64_reg_map_h = {
     "h29": UC_ARM64_REG_H29,
     "h30": UC_ARM64_REG_H30,
     "h31": UC_ARM64_REG_H31,
-}
-
-arm64_reg_map_q = {
     "q0": UC_ARM64_REG_Q0,
     "q1": UC_ARM64_REG_Q1,
     "q2": UC_ARM64_REG_Q2,
@@ -653,9 +638,6 @@ arm64_reg_map_q = {
     "q29": UC_ARM64_REG_Q29,
     "q30": UC_ARM64_REG_Q30,
     "q31": UC_ARM64_REG_Q31,
-}
-
-arm64_reg_map_s = {
     "s0": UC_ARM64_REG_S0,
     "s1": UC_ARM64_REG_S1,
     "s2": UC_ARM64_REG_S2,
@@ -688,9 +670,6 @@ arm64_reg_map_s = {
     "s29": UC_ARM64_REG_S29,
     "s30": UC_ARM64_REG_S30,
     "s31": UC_ARM64_REG_S31,
-}
-
-arm64_reg_map_w = {
     "w0": UC_ARM64_REG_W0,
     "w1": UC_ARM64_REG_W1,
     "w2": UC_ARM64_REG_W2,
@@ -722,9 +701,6 @@ arm64_reg_map_w = {
     "w28": UC_ARM64_REG_W28,
     "w29": UC_ARM64_REG_W29,
     "w30": UC_ARM64_REG_W30,
-}
-
-arm64_reg_map_v = {
     "v0": UC_ARM64_REG_V0,
     "v1": UC_ARM64_REG_V1,
     "v2": UC_ARM64_REG_V2,
@@ -757,4 +733,8 @@ arm64_reg_map_v = {
     "v29": UC_ARM64_REG_V29,
     "v30": UC_ARM64_REG_V30,
     "v31": UC_ARM64_REG_V31,
+    "fp": UC_ARM64_REG_FP,
+    "nzcv": UC_ARM64_REG_PSTATE,
+    "wzr": UC_ARM64_REG_WZR,
+    "xzr": UC_ARM64_REG_XZR,
 }

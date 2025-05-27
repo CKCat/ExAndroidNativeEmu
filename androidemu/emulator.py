@@ -101,12 +101,12 @@ class Emulator:
             "/", "."
         )
         logger.debug(package_name)
-        full_dirname = "%s/java/classes" % (cur_file_dir,)
+        full_dirname = f"{cur_file_dir}/java/classes"
 
         # 加载所有的 java 类
         preload_classes = set()
         for importer, mod_name, c in pkgutil.iter_modules([full_dirname]):
-            import_name = ".java.classes.%s" % mod_name
+            import_name = f".java.classes.{mod_name}"
             # 导入 classes 模块
             m = importlib.import_module(import_name, package_name)
             # 获取所有的 java 类
@@ -129,7 +129,7 @@ class Emulator:
         arch: int = emu_const.ARCH_ARM32,
         muti_task: bool = False,
     ):
-        # 由于这里的stream只能改一次，为避免与fork之后的子进程写到stdout混合，将这些log写到stderr
+        # 由于这里的 stream 只能改一次，为避免与 fork 之后的子进程写到 stdout 混合，将这些 log 写到 stderr
         # FIXME:解除这种特殊的依赖
         sys.stdout = sys.stderr
         self.config = config.Config(config_path)
