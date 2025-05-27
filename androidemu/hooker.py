@@ -1,7 +1,6 @@
-import logging
-import sys
 import traceback
 
+from loguru import logger
 from unicorn import UC_HOOK_CODE
 
 from .const import emu_const
@@ -111,6 +110,5 @@ class Hooker:
             # Make sure we catch exceptions inside hooks and stop emulation.
             mu.emu_stop()
             traceback.print_exc()
-            logging.exception("catch error on _hook")
-            sys.exit(-1)
-            raise
+            logger.exception("catch error on _hook")
+            raise "hook_func error"

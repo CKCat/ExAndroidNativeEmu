@@ -1,10 +1,8 @@
-import logging
+from loguru import logger
 
 from ..java.helpers.native_method import native_method
 from ..java.jni_env import JNIEnv
 from ..utils import memory_helpers
-
-logger = logging.getLogger(__name__)
 
 
 class AssetManagerHooks:
@@ -37,7 +35,8 @@ class AssetManagerHooks:
             "AAsset_read", self.__hooker.write_function(self.__AAsset_read)
         )
         self._modules.add_symbol_hook(
-            "AAsset_getLength", self.__hooker.write_function(self.__AAsset_getLength)
+            "AAsset_getLength",
+            self.__hooker.write_function(self.__AAsset_getLength),
         )
 
     #
@@ -45,12 +44,13 @@ class AssetManagerHooks:
     @native_method
     def __AAssetManager_fromJava(self, uc, env_ptr, jobj_mgr_idx):
         logger.debug(
-            "AAssetManager_fromJava call [0x%08X], [%d]" % (env_ptr, jobj_mgr_idx)
+            "AAssetManager_fromJava call [0x%08X], [%d]"
+            % (env_ptr, jobj_mgr_idx)
         )
         env_obj = self._emu.java_vm.jni_env
-        assert (
-            env_obj.address_ptr == env_ptr
-        ), "ERROR input env_ptr != main_thread ptr, impossible for single thread program!!!"
+        assert env_obj.address_ptr == env_ptr, (
+            "ERROR input env_ptr != main_thread ptr, impossible for single thread program!!!"
+        )
 
         obj = env_obj.get_reference(jobj_mgr_idx)
 
@@ -66,7 +66,9 @@ class AssetManagerHooks:
     @native_method
     def __AAssetManager_open(self, uc, amgr_ptr, filename_ptr, mode):
         filename = memory_helpers.read_utf8(uc, filename_ptr)
-        logger.debug("AAssetManager_open call [0x%08X], [%s]" % (amgr_ptr, filename))
+        logger.debug(
+            "AAssetManager_open call [0x%08X], [%s]" % (amgr_ptr, filename)
+        )
         zipf = self.__local_ptr_map[amgr_ptr]
         real_filename = "assets/%s" % filename
         zf = zipf.open(real_filename, mode="r")

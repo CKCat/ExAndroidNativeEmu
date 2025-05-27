@@ -1,3 +1,6 @@
+from loguru import logger
+
+
 class NativeMemory:
     """
     :type mu Uc
@@ -60,7 +63,7 @@ class NativeMemory:
         else:
             res = self._memory.map(addr, length, prot)
 
-        print("mmap return 0x%08X" % res)
+        logger.debug(f"mmap return 0x{res:08X}")
         return res
 
     def _handle_madvise(self, mu, start, len_in, behavior):

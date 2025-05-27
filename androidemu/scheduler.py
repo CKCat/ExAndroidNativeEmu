@@ -1,6 +1,6 @@
-import logging
 import time
 
+from loguru import logger
 from unicorn import UC_PROT_EXEC, UC_PROT_READ
 from unicorn.arm64_const import (
     UC_ARM64_REG_PC,
@@ -149,22 +149,19 @@ class Scheduler:
             if len(block_set) > 0:
                 tid = block_set.pop()
                 self.__blocking_set.remove(tid)
-                logging.debug(
-                    "%d futex_wake tid %d waiting in futex_ptr 0x%08X is unblocked"
-                    % (cur_tid, tid, futex_ptr)
+                logger.debug(
+                    f"{cur_tid} futex_wake tid {tid} waiting in futex_ptr 0x{futex_ptr:08X} is unblocked"
                 )
                 return True
             else:
-                logging.info(
-                    "%d futex_wake unblock nobody waiting in futex ptr 0x%08X"
-                    % (cur_tid, futex_ptr)
+                logger.info(
+                    f"{cur_tid} futex_wake unblock nobody waiting in futex ptr 0x{futex_ptr:08X}"
                 )
                 return False
 
         else:
-            logging.info(
-                "%d futex_wake unblock nobody waiting in futex ptr 0x%08X"
-                % (cur_tid, futex_ptr)
+            logger.info(
+                f"{cur_tid} futex_wake unblock nobody waiting in futex ptr 0x{futex_ptr:08X}"
             )
             return False
 
@@ -183,7 +180,7 @@ class Scheduler:
 
     # yield the task.
     def yield_task(self):
-        logging.debug("tid %d yield" % self.__cur_tid)
+        logger.debug(f"tid {self.__cur_tid} yield")
         self.__emu.mu.emu_stop()
 
     def exit_current_task(self):
@@ -214,9 +211,8 @@ class Scheduler:
                             )
                         else:
                             # 优化，如果仅仅只有一个线程block，而且有timeout，直接sleep就行了，因为再继续运行都是没意义的循环
-                            logging.debug(
-                                "only on task %d block with timeout %d ms do sleep"
-                                % (tid, task.blocking_timeout)
+                            logger.debug(
+                                f"only on task {tid} block with timeout {task.blocking_timeout} ms do sleep"
                             )
                             time.sleep(task.blocking_timeout / 1000)
                             # sleep返回则完成block
@@ -227,30 +223,21 @@ class Scheduler:
                             now = int(time.time() * 1000)
                             if now - task.halt_ts < task.blocking_timeout:
                                 # 仍然未睡够，继续睡
-                                logging.debug(
-                                    "%d is blocking skip scheduling ts has block %d ms timeout %d ms"
-                                    % (
-                                        tid,
-                                        now - task.halt_ts,
-                                        task.blocking_timeout,
-                                    )
+                                logger.debug(
+                                    f"{tid} is blocking skip scheduling ts has block {now - task.halt_ts} ms timeout {task.blocking_timeout} ms"
                                 )
                                 continue
                             else:
-                                logging.debug(
-                                    "%d is wait up for timeout" % (tid,)
-                                )
+                                logger.debug(f"{tid} is wait up for timeout")
                                 task.blocking_timeout = -1
                                 self.__blocking_set.remove(tid)
                                 # 睡够了，不跳过循环 继续执行调度
                         else:
                             # 无限期block，直接跳过调度
-                            logging.debug(
-                                "%d is blocking skip scheduling" % (tid,)
-                            )
+                            logger.debug(f"{tid} is blocking skip scheduling")
                             continue
 
-                logging.debug("%d scheduling enter " % tid)
+                logger.debug(f"{tid} scheduling enter ")
 
                 self.__cur_tid = tid
                 # run
@@ -280,7 +267,6 @@ class Scheduler:
                         self.__clear_reg0()
                         task.is_init = False
 
-                # print(hex(start_pos))
                 # 加上uc timeout参数有bug，会随机崩溃，这个机制是uc内部使用多线程实现的，但uc对象根本不是线程安全的，指令数可以加，但是很慢
                 # 第四个参数传100执行arm64的android6 libc会触发bug，具体原因见hooker.py FIXME注释
                 self.__emu.mu.emu_start(start_pos, self.__stop_pos, 0, 0)
@@ -292,10 +278,10 @@ class Scheduler:
                 # 运行结束，任务标记成可删除
                 if self.__get_pc() == self.__stop_pos or task.is_exit:
                     self.__tid_2_remove.add(self.__cur_tid)
-                    logging.debug("%d scheduling exit" % tid)
+                    logger.debug(f"{tid} scheduling exit")
 
                 else:
-                    logging.debug("%d scheduling paused" % tid)
+                    logger.debug(f"{tid} scheduling paused")
 
             # 在调度里面清掉退出的线程
             for tid in self.__tid_2_remove:
@@ -313,9 +299,7 @@ class Scheduler:
 
             if self.__pid not in self.__tasks_map:
                 # 主线程退出，退出调度循环
-                logging.debug(
-                    "main_thead tid [%d] exit exec return" % self.__pid
-                )
+                logger.debug(f"main_thread tid [{self.__pid}] exit exec return")
                 if clear_task_when_return:
                     # clear all unfinished task
                     self.__tasks_map.clear()

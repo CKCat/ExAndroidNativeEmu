@@ -164,7 +164,6 @@ class ContextImpl(
         native=False,
     )
     def getSystemService(self, emu, s1):
-        print(s1)
         stype = s1.get_py_string()
         if stype == "phone":
             return TelephonyManager()

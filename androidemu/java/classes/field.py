@@ -1,4 +1,4 @@
-import logging
+from loguru import logger
 
 from ..java_class_def import JavaClassDef
 from ..java_method_def import java_method_def
@@ -17,7 +17,7 @@ class AccessibleObject(
         native=False,
     )
     def setAccessible(self, emu, access):
-        logging.debug("AccessibleObject setAccessible call skip")
+        logger.debug("AccessibleObject setAccessible call skip")
 
 
 class Field(
@@ -38,7 +38,7 @@ class Field(
         native=False,
     )
     def get(self, emu, obj):
-        logging.debug("Field.get(%r)" % obj)
+        logger.debug("Field.get(%r)" % obj)
 
         v = getattr(obj, self.__fieldName)
         return v

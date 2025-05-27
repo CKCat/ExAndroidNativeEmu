@@ -1,5 +1,6 @@
 import io
-import logging
+
+from loguru import logger
 
 from ..constant_values import JAVA_NULL
 from ..java_class_def import JavaClassDef
@@ -8,8 +9,6 @@ from .activity_thread import ActivityManagerNative, ActivityThread
 from .field import Field
 from .method import Method
 from .string import String
-
-logger = logging.getLogger(__name__)
 
 
 class Class(metaclass=JavaClassDef, jvm_name="java/lang/Class"):

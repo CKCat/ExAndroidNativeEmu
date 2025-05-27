@@ -11,11 +11,10 @@ from ..const import emu_const
 g_isWin = platform.system() == "Windows"
 
 
-def vfs_path_to_system_path(vfs_root, path):
+def vfs_path_to_system_path(vfs_root:str, path:str):
     if os.name == "nt":
         path = path.replace(":", "_")
     fullpath = f"{vfs_root}{path}"
-    logger.debug(f"vfs_path_to_system_path: {vfs_root} ; {path}")
     logger.debug(f"vfs_path_to_system_path: {fullpath}")
     return fullpath
 

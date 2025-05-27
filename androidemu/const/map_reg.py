@@ -299,8 +299,10 @@ from unicorn.arm_const import (
     UC_ARM_REG_D29,
     UC_ARM_REG_D30,
     UC_ARM_REG_D31,
+    UC_ARM_REG_FP,
     UC_ARM_REG_FPEXC,
     UC_ARM_REG_FPSCR,
+    UC_ARM_REG_IP,
     UC_ARM_REG_LR,
     UC_ARM_REG_PC,
     UC_ARM_REG_Q0,
@@ -332,6 +334,9 @@ from unicorn.arm_const import (
     UC_ARM_REG_R10,
     UC_ARM_REG_R11,
     UC_ARM_REG_R12,
+    UC_ARM_REG_R13,
+    UC_ARM_REG_R14,
+    UC_ARM_REG_R15,
     UC_ARM_REG_S0,
     UC_ARM_REG_S1,
     UC_ARM_REG_S2,
@@ -364,6 +369,8 @@ from unicorn.arm_const import (
     UC_ARM_REG_S29,
     UC_ARM_REG_S30,
     UC_ARM_REG_S31,
+    UC_ARM_REG_SB,
+    UC_ARM_REG_SL,
     UC_ARM_REG_SP,
 )
 
@@ -469,6 +476,13 @@ arm_reg_map = {
     "s29": UC_ARM_REG_S29,
     "s30": UC_ARM_REG_S30,
     "s31": UC_ARM_REG_S31,
+    "r13": UC_ARM_REG_R13,
+    "r14": UC_ARM_REG_R14,
+    "r15": UC_ARM_REG_R15,
+    "sb": UC_ARM_REG_SB,
+    "sl": UC_ARM_REG_SL,
+    "fp": UC_ARM_REG_FP,
+    "ip": UC_ARM_REG_IP,
 }
 
 

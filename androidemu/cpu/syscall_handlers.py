@@ -87,7 +87,7 @@ class SyscallHandlers:
         lr = mu.reg_read(UC_ARM64_REG_LR)
         tid = self.__sch.get_current_tid()
 
-        logger.debug(f"{tid} syscall {idx} lr=0x{lr}%016X")
+        logger.debug(f"{tid} syscall {idx} lr=0x{lr:016X}")
         args = [
             mu.reg_read(reg_idx)
             for reg_idx in range(UC_ARM64_REG_X0, UC_ARM64_REG_X6 + 1)
@@ -96,10 +96,10 @@ class SyscallHandlers:
         if idx in self._handlers:
             handler = self._handlers[idx]
             args = args[: handler.arg_count]
-            args_formatted = ", ".join(["0x%016X" % arg for arg in args])
+            args_formatted = ", ".join(["0x%08X" % arg for arg in args])
             pc = mu.reg_read(UC_ARM64_REG_PC)
             logger.debug(
-                f"{tid} Executing syscall {handler.name}({args_formatted}) at {pc:016X}"
+                f"{tid} Executing syscall {handler.name}({args_formatted}) at {pc:08X}"
             )
             try:
                 result = handler.callback(mu, *args)

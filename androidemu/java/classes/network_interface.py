@@ -1,3 +1,5 @@
+from loguru import logger
+
 from ..java_class_def import JavaClassDef
 from ..java_method_def import java_method_def
 from .array import Array
@@ -17,7 +19,7 @@ class NetworkInterface(
         native=False,
     )
     def getByName(emu, s1):
-        print("getByName %r" % s1)
+        logger.debug(f"getByName {s1}")
         pyname = s1.get_py_string()
         return NetworkInterface(pyname)
 

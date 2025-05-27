@@ -1,5 +1,3 @@
-import logging
-
 from loguru import logger
 from unicorn import UC_PROT_READ, UC_PROT_WRITE
 
@@ -280,7 +278,7 @@ class JNIEnv:
         if self._globals.in_range(idx):
             return self._globals.get(idx)
 
-        raise RuntimeError("Invalid get_reference(%d)" % idx)
+        raise RuntimeError(f"Invalid get_reference({idx})")
 
     def add_local_reference(self, obj):
         if not isinstance(obj, jobject):
@@ -325,7 +323,8 @@ class JNIEnv:
     # args is a tuple or list
     def __read_args32(self, mu, args, args_type_list):
         # 在这里处理八个字节参数问题，
-        # 1.第一个参数为jlong jdouble 直接跳过列表第一个成员，因为第一个成员刚好是call_xxx的第三个参数，根据调用约定，如果这个参数是8个字节，则直接跳过R3寄存器使用栈
+        # 1.第一个参数为jlong jdouble 直接跳过列表第一个成员，因为第一个成员刚好是
+        # call_xxx的第三个参数，根据调用约定，如果这个参数是8个字节，则直接跳过R3寄存器使用栈
         # 2.jlong或者jdouble需要两个arg成一个参数，对应用层透明
         if args_type_list is None:
             return []
@@ -362,16 +361,15 @@ class JNIEnv:
                 jobj = self.get_reference(ref)
                 obj = None
                 if jobj is None:
-                    logging.warning(
-                        "arg_name %s ref %d is not vaild maybe wrong arglist"
-                        % (arg_name, ref)
+                    logger.warning(
+                        f"arg_name {arg_name} ref {ref} is not vaild maybe wrong arglist"
                     )
                     obj = JAVA_NULL
                 else:
                     obj = jobj.value
                 result.append(obj)
             else:
-                raise NotImplementedError("Unknown arg name %s" % arg_name)
+                raise NotImplementedError(f"Unknown arg name {arg_name}")
             args_index = args_index + 1
             args_list_index = args_list_index + 1
 
@@ -384,10 +382,10 @@ class JNIEnv:
 
         result = []
         n = len(args_type_list)
-        print(n)
+        logger.debug(f"args_type_list length {n}")
         nargs = len(args)
 
-        for args_index in nargs:
+        for args_index in range(nargs):
             arg_name = args_type_list[args_index]
             v = args[args_index]
             if arg_name in (
@@ -405,16 +403,15 @@ class JNIEnv:
                 jobj = self.get_reference(ref)
                 obj = None
                 if jobj is None:
-                    logging.warning(
-                        "arg_name %s ref %d is not vaild maybe wrong arglist"
-                        % (arg_name, ref)
+                    logger.warning(
+                        f"arg_name {arg_name} ref {ref} is not vaild maybe wrong arglist"
                     )
                     obj = JAVA_NULL
                 else:
                     obj = jobj.value
                 result.append(obj)
             else:
-                raise NotImplementedError("Unknown arg name %s" % arg_name)
+                raise NotImplementedError(f"Unknown arg name {arg_name}")
 
         return result
 
@@ -441,16 +438,15 @@ class JNIEnv:
                 jobj = self.get_reference(ref)
                 obj = None
                 if jobj is None:
-                    logging.warning(
-                        "arg_name %s ref %d is not vaild maybe wrong arglist"
-                        % (arg_name, ref)
+                    logger.warning(
+                        f"arg_name {arg_name} ref {ref} is not vaild maybe wrong arglist"
                     )
                     obj = JAVA_NULL
                 else:
                     obj = jobj.value
                 result.append(obj)
             else:
-                raise NotImplementedError("Unknown arg name %s" % arg_name)
+                raise NotImplementedError(f"Unknown arg name {arg_name}")
 
             args_ptr = args_ptr + 4
 
@@ -481,16 +477,15 @@ class JNIEnv:
                 jobj = self.get_reference(ref)
                 obj = None
                 if jobj is None:
-                    logging.warning(
-                        "arg_name %s ref %d is not vaild maybe wrong arglist"
-                        % (arg_name, ref)
+                    logger.warning(
+                        f"arg_name {arg_name} ref {ref} is not vaild maybe wrong arglist"
                     )
                     obj = JAVA_NULL
                 else:
                     obj = jobj.value
                 result.append(obj)
             else:
-                raise NotImplementedError("Unknown arg name %s" % arg_name)
+                raise NotImplementedError(f"Unknown arg name {arg_name}")
 
             args_ptr = args_ptr + ptr_size
 
@@ -505,14 +500,14 @@ class JNIEnv:
             args_ptr = args
             return self.__read_args_v(mu, args_ptr, args_type_list)
         else:
-            raise RuntimeError("arg_type %d not support" % arg_type)
+            raise RuntimeError(f"arg_type {arg_type} not support")
 
     @staticmethod
     def jobject_to_pyobject(obj):
         if isinstance(obj, jobject):
             return obj.value
         else:
-            raise RuntimeError("jobject_to_pyobject unknown obj type %r" % obj)
+            raise RuntimeError(f"jobject_to_pyobject unknown obj type {obj}")
 
     @native_method
     def get_version(self, mu, env):
@@ -529,15 +524,15 @@ class JNIEnv:
         Returns a class object from a fully-qualified name, or NULL if the class cannot be found.
         """
         name = memory_helpers.read_utf8(mu, name_ptr)
-        logger.debug("JNIEnv->FindClass(%s) was called" % name)
+        logger.debug(f"JNIEnv->FindClass({name}) was called")
 
         pyclazz = self._class_loader.find_class_by_name(name)
         if pyclazz is None:
             # TODO: Proper Java error?
-            raise RuntimeError("Could not find class '%s' for JNIEnv." % name)
+            raise RuntimeError(f"Could not find class '{name}' for JNIEnv.")
 
         if pyclazz.jvm_ignore:
-            logger.debug("FindClass %s return 0 because of ignored")
+            logger.debug(f"FindClass {name} return 0 because of ignored")
             return 0
 
         # jclass包裹的都是Class的对象(Java Class Object)
@@ -572,8 +567,7 @@ class JNIEnv:
         method = pyclazz.find_method_by_id(method_id)
         if method is None:
             raise RuntimeError(
-                "Could not find method ('%u') in class %s."
-                % (method_id, pyclazz.jvm_name)
+                f"Could not find method ('{method_id}') in class {pyclazz.jvm_name}."
             )
 
         if method.modifier & MODIFIER_STATIC:
@@ -586,8 +580,7 @@ class JNIEnv:
             )
 
         logger.debug(
-            "JNIEnv->ToReflectedMethod(%s, %s, %u) was called"
-            % (pyclazz.jvm_name, method.name, is_static)
+            f"JNIEnv->ToReflectedMethod({pyclazz.jvm_name}, {method.name}, {is_static}) was called"
         )
 
         if method.name == "<init>" and method.signature.endswith("V"):
@@ -605,17 +598,16 @@ class JNIEnv:
         class_obj = jclazz.value
         pyclass = class_obj.get_py_clazz()
 
-        logger.debug("JNIEnv->GetSuperClass (%s) is called" % pyclass.jvm_name)
+        logger.debug(f"JNIEnv->GetSuperClass ({pyclass.jvm_name}) is called")
 
         pyclazz_super = pyclass.jvm_super
         if not pyclazz_super:
             raise RuntimeError(
-                "super class for %s is None!!! you should at least inherit Object!!!"
+                f"super class for {pyclass.jvm_name} is None!!! you should at least inherit Object!!!"
             )
 
         logger.debug(
-            "JNIEnv->GetSuperClass (%s) return (%s)"
-            % (pyclass.jvm_name, pyclazz_super.jvm_name)
+            f"JNIEnv->GetSuperClass ({pyclass.jvm_name}) return ({pyclazz_super.jvm_name})"
         )
         clazz_super_object = pyclazz_super.class_object
         return self.add_local_reference(jclass(clazz_super_object))
@@ -632,8 +624,7 @@ class JNIEnv:
         pyclass2 = class_obj2.get_py_clazz()
 
         logger.debug(
-            "JNIEnv->IsAssignableFrom (%s,%s) is called"
-            % (pyclass1.jvm_name, pyclass2.jvm_name)
+            f"JNIEnv->IsAssignableFrom ({pyclass1.jvm_name},{pyclass2.jvm_name}) is called"
         )
         r = JNI_FALSE
         jvm_super = pyclass1.jvm_super
@@ -645,8 +636,7 @@ class JNIEnv:
             jvm_super = jvm_super.jvm_super
 
         logger.debug(
-            "JNIEnv->IsAssignableFrom (%s,%s) return (%d)"
-            % (pyclass1.jvm_name, pyclass2.jvm_name, r)
+            f"JNIEnv->IsAssignableFrom ({pyclass1.jvm_name},{pyclass2.jvm_name}) return ({r})"
         )
         return r
 
@@ -699,7 +689,7 @@ class JNIEnv:
         Creates a new global reference to the object referred to by the obj argument. The obj argument may be a
         global or local reference. Global references must be explicitly disposed of by calling DeleteGlobalRef().
         """
-        logger.debug("JNIEnv->NewGlobalRef(%d) was called" % jobj)
+        logger.debug(f"JNIEnv->NewGlobalRef({jobj}) was called")
 
         if jobj == 0:
             return 0
@@ -718,7 +708,7 @@ class JNIEnv:
         """
         Deletes the global reference pointed to by globalRef.
         """
-        logger.debug("JNIEnv->DeleteGlobalRef(%d) was called" % idx)
+        logger.debug(f"JNIEnv->DeleteGlobalRef({idx}) was called")
 
         if idx == 0:
             return None
@@ -731,7 +721,7 @@ class JNIEnv:
         """
         Deletes the local reference pointed to by localRef.
         """
-        logger.debug("JNIEnv->DeleteLocalRef(%d) was called" % idx)
+        logger.debug(f"JNIEnv->DeleteLocalRef({idx}) was called")
 
         if idx == 0:
             return None
@@ -744,7 +734,7 @@ class JNIEnv:
         """
         Returns JNI_TRUE if ref1 and ref2 refer to the same Java object, or are both NULL; otherwise, returns JNI_FALSE.
         """
-        logger.debug("JNIEnv->IsSameObject(%d, %d) was called" % (ref1, ref2))
+        logger.debug(f"JNIEnv->IsSameObject({ref1}, {ref2}) was called")
 
         if ref1 == 0 and ref2 == 0:
             return JNI_TRUE
@@ -765,7 +755,7 @@ class JNIEnv:
         Creates a new local reference that refers to the same object as ref.
         The given ref may be a global or local reference. Returns NULL if ref refers to null.
         """
-        logger.debug("JNIEnv->NewLocalRef(%d) was called" % ref)
+        logger.debug(f"JNIEnv->NewLocalRef({ref}) was called")
 
         obj = self.get_reference(ref)
 
@@ -805,8 +795,7 @@ class JNIEnv:
             )
 
         logger.debug(
-            "JNIEnv->NewObjectX(%s, %s, %r) was called"
-            % (pyclazz.jvm_name, method.name, args)
+            f"JNIEnv->NewObjectX({pyclazz.jvm_name}, {method.name}, {args}) was called"
         )
 
         # Parse arguments.
@@ -840,12 +829,11 @@ class JNIEnv:
         if obj is None:
             # TODO: Proper Java error?
             raise RuntimeError(
-                "get_object_class can not get class for object id %d for JNIEnv."
-                % obj_idx
+                f"get_object_class can not get class for object id {obj_idx} for JNIEnv."
             )
 
         pyobj = JNIEnv.jobject_to_pyobject(obj)
-        logger.debug("JNIEnv->GetObjectClass(%r) was called" % (pyobj,))
+        logger.debug(f"JNIEnv->GetObjectClass({pyobj}) was called")
 
         pyclazz = pyobj.__class__
 
@@ -896,18 +884,16 @@ class JNIEnv:
 
         pyclazz = class_obj.get_py_clazz()
 
-        logging.debug("get_method_id type %s" % (pyclazz))
+        logger.debug("get_method_id type %s" % (pyclazz))
         method = pyclazz.find_method(name, sig)
 
         if method is None:
             # TODO: Proper Java error?
             raise RuntimeError(
-                "Could not find method ('%s', '%s') in class %s."
-                % (name, sig, pyclazz.jvm_name)
+                f"Could not find method ('{name}', '{sig}') in class {pyclazz.jvm_name}."
             )
         logger.debug(
-            "JNIEnv->GetMethodId(%d, %s, %s) return 0x%08X"
-            % (clazz_idx, name, sig, method.jvm_id)
+            f"JNIEnv->GetMethodId({clazz_idx}, {name}, {sig}) return 0x{method.jvm_id:08X}"
         )
         return method.jvm_id
 
@@ -924,13 +910,11 @@ class JNIEnv:
         if method is None:
             # TODO: Proper Java error?
             raise RuntimeError(
-                "Could not find method %d in object %s by id."
-                % (method_id, pyobj.jvm_name)
+                f"Could not find method {method_id} in object {pyobj.jvm_name} by id."
             )
 
         logger.debug(
-            "JNIEnv->CallXXXMethodX(%s, %s <%s>, %r) was called"
-            % (pyobj.jvm_name, method.name, method.signature, args)
+            f"JNIEnv->CallXXXMethodX({pyobj.jvm_name}, {method.name} <{method.signature}>, {args}) was called"
         )
 
         # Parse arguments.
@@ -1847,17 +1831,14 @@ class JNIEnv:
 
     @native_method
     def get_string_utf_chars(self, mu, env, string, is_copy_ptr):
-        logger.debug(
-            "JNIEnv->GetStringUtfChars(%u, %x) was called"
-            % (string, is_copy_ptr)
-        )
+        logger.debug(f"GetStringUtfChars({string}, {is_copy_ptr}) was called")
 
         str_ref = self.get_reference(string)
         str_obj = str_ref.value
         if str_obj == JAVA_NULL:
             return JAVA_NULL
 
-        str_val = str_obj.get_py_string()
+        str_val = str_obj
         # FIXME use malloc
         str_ptr = self._emu.memory.map(
             0, len(str_val) + 1, UC_PROT_READ | UC_PROT_WRITE

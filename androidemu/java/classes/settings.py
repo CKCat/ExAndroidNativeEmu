@@ -1,3 +1,5 @@
+from loguru import logger
+
 from ..java_class_def import JavaClassDef
 from ..java_method_def import java_method_def
 from .string import String
@@ -17,7 +19,7 @@ class Secure(
         native=False,
     )
     def getString(emu, resolver, s1):
-        print("call getString %r %r" % (resolver, s1))
+        logger.debug(f"call getString {resolver} {s1}")
         pys1 = s1.get_py_string()
         if pys1 == "android_id":
             android_id = emu.config.get("android_id")

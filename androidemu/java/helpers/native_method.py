@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from typing import TYPE_CHECKING
 
 from unicorn.arm64_const import (
     UC_ARM64_REG_SP,
@@ -11,10 +12,13 @@ from unicorn.arm_const import UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_SP
 
 from ...const import emu_const
 from ..java_class_def import JavaClassDef
-from ..jni_ref import jobject
+from ..jni_ref import jbyteArray, jclass, jobject, jobjectArray, jstring
+
+if TYPE_CHECKING:
+    from ...emulator import Emulator
 
 
-def native_write_args(emu, *args):
+def native_write_args(emu: "Emulator", *args):
     """设置函数的参数
 
     Args:
@@ -61,7 +65,7 @@ def native_write_args(emu, *args):
         emu.mu.reg_write(sp_reg, sp_end)
 
 
-def native_read_args_in_hook_code(emu, args_count):
+def native_read_args_in_hook_code(emu: "Emulator", args_count: int):
     max_regs_args = 4  # 寄存器参数个数
     reg_base = UC_ARM_REG_R0
     sp_reg = UC_ARM_REG_SP
@@ -95,16 +99,20 @@ def native_read_args_in_hook_code(emu, args_count):
     return native_args
 
 
-def native_translate_arg(emu, val):
+def native_translate_arg(emu: "Emulator", val):
     if isinstance(val, int):
         return val
+    elif isinstance(val, str):
+        return emu.java_vm.jni_env.add_local_reference(jstring(val))
+    elif isinstance(val, list):
+        return emu.java_vm.jni_env.add_local_reference(jobjectArray(val))
     elif isinstance(val, bytearray):
-        return emu.java_vm.jni_env.add_local_reference(jobject(val))
+        return emu.java_vm.jni_env.add_local_reference(jbyteArray(val))
     elif isinstance(type(val), JavaClassDef):
         # TODO: Look into this, seems wrong..
         return emu.java_vm.jni_env.add_local_reference(jobject(val))
     elif isinstance(val, JavaClassDef):
-        return emu.java_vm.jni_env.add_local_reference(jobject(val))
+        return emu.java_vm.jni_env.add_local_reference(jclass(val))
     else:
         raise NotImplementedError(
             "Unable to write response '%s' type '%s' to emulator."
@@ -112,11 +120,11 @@ def native_translate_arg(emu, val):
         )
 
 
-def native_write_arg_register(emu, reg, val):
+def native_write_arg_register(emu: "Emulator", reg: int, val):
     emu.mu.reg_write(reg, native_translate_arg(emu, val))
 
 
-# 定义native层回调到python的方法
+# 定义 native 层回调到 python 的方法
 def native_method(func):
     def native_method_wrapper(*argv):
         """
@@ -142,7 +150,6 @@ def native_method(func):
             result = func(mu, *native_args)
         else:
             le = len(native_args)
-            print(le)
             result = func(argv[0], mu, *native_args)
 
         ret_reg0 = UC_ARM_REG_R0

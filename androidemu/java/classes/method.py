@@ -1,12 +1,10 @@
-import logging
+from loguru import logger
 
 from ..constant_values import JAVA_NULL
 from ..java_class_def import JavaClassDef
 from ..java_field_def import JavaFieldDef
 from ..java_method_def import JavaMethodDef, java_method_def
 from .executable import Executable
-
-logger = logging.getLogger(__name__)
 
 
 class Method(

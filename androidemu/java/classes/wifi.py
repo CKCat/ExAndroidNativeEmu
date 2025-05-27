@@ -176,7 +176,6 @@ class RequestBuilder(
     def addTransportType(self, emu, i):
         # IMEI
         # FIXME 读配置文件
-        print(i)
         return RequestBuilder()
 
 

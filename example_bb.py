@@ -78,8 +78,6 @@ class DexInstallV26(
     def __init__(self):
         pass
 
-    #
-
     @staticmethod
     @java_method_def(
         name="install",
@@ -112,7 +110,7 @@ lib_module = emulator.load_library("tests/bin/libSecShell.so")
 logger.info("Loaded modules:")
 
 for module in emulator.modules:
-    logger.info("=> 0x%08x - %s" % (module.base, module.filename))
+    logger.info(f"=> 0x{module.base:08x} - {module.filename}")
 
 try:
     # Run JNI_OnLoad.

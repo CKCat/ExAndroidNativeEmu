@@ -874,7 +874,6 @@ class SyscallHooks:
             logger.warning("protocol 0 not support")
             return -1
 
-        # print(family)
         s = socket.socket(family, type_in, protocol)
         socket_id = s.fileno()
         self.__pcb.add_fd("[socket]", "[socket]", socket_id)
@@ -949,7 +948,6 @@ class SyscallHooks:
             has_read += len(tmp)
             off_l += 2 * self.__ptr_sz
 
-        # print(b)
         return has_read
 
     def _ARM_cacheflush(self, mu):

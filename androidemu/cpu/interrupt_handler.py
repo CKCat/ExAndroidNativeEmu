@@ -1,5 +1,4 @@
 import inspect
-import sys
 import traceback
 
 from loguru import logger
@@ -37,10 +36,10 @@ class InterruptHandler:
                 logger.error("catch error on _hook_interrupt")
                 logger.error(stack_trace[:-1])
                 self._mu.emu_stop()
-                sys.exit(-1)
+
         except Exception:
             logger.exception(f"exception in _hook_interrupt intno:[{intno}]")
-            sys.exit(-1)
+            raise "exception in _hook_interrupt intno:[{intno}]"
 
     def set_handler(self, intno: int, handler: callable):
         self._handlers[intno] = handler

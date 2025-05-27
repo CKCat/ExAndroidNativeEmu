@@ -1,6 +1,6 @@
-import logging
 import os
 
+from loguru import logger
 from unicorn import UC_PROT_ALL, UC_PROT_READ, UC_PROT_WRITE
 from unicorn.arm64_const import UC_ARM64_REG_TPIDR_EL0
 from unicorn.arm_const import UC_ARM_REG_C13_C0_3
@@ -14,8 +14,6 @@ from ..vfs.virtual_file import VirtualFile
 from . import arm, elf_reader
 from .module import Module
 
-logger = logging.getLogger(__name__)
-
 
 class Modules:
     def __tls_init(self):
@@ -26,7 +24,6 @@ class Modules:
         thread_internal_ptr = sp_helpers.reserve(pthread_internal_nptr)
 
         stack_guard_ptr = sp_helpers.write_val(0x1000)
-        # print(hex(stack_guard_ptr))
 
         # argv的实际字符串，目前只写一个
         argvs = ["app_process32"]
@@ -67,7 +64,6 @@ class Modules:
         }
         auxv_base = sp_helpers.reserve(0x100)
         auxv_offset = auxv_base
-        # print(hex(auxv_base).upper())
         for auxv_key in auxvs:
             # 填充auvx数组
             auxv_val = auxvs[auxv_key]
@@ -106,8 +102,6 @@ class Modules:
 
         # 0结尾
         memory_helpers.write_ptrs_sz(self.emu.mu, argv_offset, 0, ptr_sz)
-
-        # print(hex(kernel_args_base).upper())
 
         # KernelArgumentBlock
         # int argc;
@@ -192,7 +186,7 @@ class Modules:
             ld_library_path = self.__get_ld_library_path()
             so_name = so_path
             for lib_path in ld_library_path:
-                lib_full_path = f"{lib_path}/{so_name}"
+                lib_full_path = f"{lib_path}{so_name}"
                 vfs_lib_path = misc_utils.vfs_path_to_system_path(
                     self.__vfs_root, lib_full_path
                 )
@@ -364,12 +358,11 @@ class Modules:
             path = self.find_so_on_disk(so_name)
             if path is None:
                 logger.warning(
-                    f"{so_name} needed by {filename} do not exist in vfs {self.__vfs_root}"
+                    f"{so_name} needed by {filename} do not exist in {self.__vfs_root}"
                 )
                 continue
 
             libmod = self.load_module(path)
-            print(libmod)
 
         rels = reader.get_rels()
         symbols = reader.get_symbols()
@@ -396,8 +389,6 @@ class Modules:
                 )  # Location where relocation should happen
                 rel_info_type = rel["r_info_type"]
 
-                # print(filename)
-                # print("%x"%rel_addr)
                 # Relocation table for ARM
 
                 sym_name = reader.get_dyn_string_by_rel_sym(r_info_sym)
@@ -414,7 +405,6 @@ class Modules:
                         # *reinterpret_cast<Elf32_Addr*>(reloc) += sym_addr;
                         value = sym_addr + value_orig
                         # Write the new value
-                        # print(value)
                         self.emu.mu.mem_write(
                             rel_addr, value.to_bytes(4, byteorder="little")
                         )
@@ -435,7 +425,6 @@ class Modules:
 
                         value = sym_addr + value_orig + addend
                         # Write the new value
-                        # print(value)
                         self.emu.mu.mem_write(
                             rel_addr, value.to_bytes(8, byteorder="little")
                         )
@@ -448,7 +437,6 @@ class Modules:
                         value = symbols_resolved[sym_name]
 
                         # Write the new value
-                        # print(value)
                         self.emu.mu.mem_write(
                             rel_addr, value.to_bytes(4, byteorder="little")
                         )
@@ -464,7 +452,6 @@ class Modules:
                         value = symbols_resolved[sym_name]
                         addend = rel["r_addend"]
                         # Write the new value
-                        # print(value)
                         self.emu.mu.mem_write(
                             rel_addr,
                             (value + addend).to_bytes(8, byteorder="little"),
@@ -481,7 +468,6 @@ class Modules:
                         # Create the new value
                         value = load_bias + value_orig
 
-                        # print(value)
                         # Write the new value
                         self.emu.mu.mem_write(
                             rel_addr, value.to_bytes(4, byteorder="little")
@@ -495,7 +481,6 @@ class Modules:
                         # Create the new value
                         value = load_bias + addend
 
-                        # print(value)
                         # Write the new value
                         self.emu.mu.mem_write(
                             rel_addr, value.to_bytes(8, byteorder="little")
@@ -544,12 +529,12 @@ class Modules:
         if do_init:
             """
             for r in self.emu.mu.mem_regions():
-                print("region begin :0x%08X end:0x%08X, prot:%d"%(r[0], r[1], r[2]))
+                logger.debug("region begin :0x%08X end:0x%08X, prot:%d"%(r[0], r[1], r[2]))
             #
             """
             module.call_init(self.emu)
 
-        logger.info("finish load lib %s base 0x%08X" % (filename, load_base))
+        logger.info(f"finish load lib {filename} base 0x{load_base:08X}.")
         return module
 
     def _elf_get_symval(self, load_bias, symbol):
@@ -566,7 +551,7 @@ class Modules:
                     # Weak symbol initialized as 0
                     return 0
                 else:
-                    logger.error("=> Undefined external symbol: %s" % name)
+                    logger.error(f"=> Undefined external symbol: {name}")
                     return None
             else:
                 return target

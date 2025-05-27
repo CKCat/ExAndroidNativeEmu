@@ -1,10 +1,8 @@
-import logging
+from loguru import logger
 
 from .helpers.native_method import native_method
 from .jni_const import JNI_OK
 from .jni_env import JNIEnv
-
-logger = logging.getLogger(__name__)
 
 
 # https://docs.oracle.com/javase/7/docs/technotes/guides/jni/spec/invocation.html
@@ -43,8 +41,7 @@ class JavaVM:
     @native_method
     def attach_current_thread(self, mu, java_vm, env_ptr, thr_args):
         logger.debug(
-            "JavaVM->AttachCurrentThread(0x%08x, 0x%08x, 0x%08x)"
-            % (java_vm, env_ptr, thr_args)
+            f"JavaVM->AttachCurrentThread(0x{java_vm:08x}, 0x{env_ptr:08x}, 0x{thr_args:08x})"
         )
         mu.mem_write(
             env_ptr,
@@ -57,14 +54,13 @@ class JavaVM:
     @native_method
     def detach_current_thread(self, mu, java_vm):
         # TODO: NooOO idea.
-        logger.debug("JavaVM->DetachCurrentThread(0x%08x)" % (java_vm,))
+        logger.debug(f"JavaVM->DetachCurrentThread(0x{java_vm:08x})")
         return JNI_OK
 
     @native_method
     def get_env(self, mu, java_vm, env_ptr, version):
         logger.debug(
-            "JavaVM->GetEnv(0x%08x, 0x%08x, 0x%08x)"
-            % (java_vm, env_ptr, version)
+            f"JavaVM->GetEnv(0x{java_vm:08x}, 0x{env_ptr:08x}, 0x{version:08x})"
         )
         mu.mem_write(
             env_ptr,
@@ -77,8 +73,7 @@ class JavaVM:
     @native_method
     def attach_current_thread_as_daemon(self, mu, java_vm, env_ptr, thr_args):
         logger.debug(
-            "JavaVM->AttachCurrentThreadAsDaemon(0x%08x, 0x%08x, 0x%08x)"
-            % (java_vm, env_ptr, thr_args)
+            f"JavaVM->AttachCurrentThreadAsDaemon(0x{java_vm:08x}, 0x{env_ptr:08x}, 0x{thr_args:08x})"
         )
         mu.mem_write(
             env_ptr,

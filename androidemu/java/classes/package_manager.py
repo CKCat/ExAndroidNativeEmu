@@ -1,5 +1,6 @@
-import logging
 import time
+
+from loguru import logger
 
 from ..java_class_def import JavaClassDef
 from ..java_field_def import JavaFieldDef
@@ -105,7 +106,7 @@ class PackageManager(
         version_code = emu.config.get("version_code")
         if version_code is None:
             version_code = 0
-            logging.info("version_code not config default to 0")
+            logger.debug("version_code not config default to 0")
 
         pkg_info = PackageInfo(self.__pyPkgName, sign_hex, version_code)
         return pkg_info
@@ -119,5 +120,5 @@ class PackageManager(
     def checkPermission(self, *args, **kwargs):
         #     PERMISSION_DENIED = -1;
         #     PERMISSION_GRANTED = 0;
-        # print('Check Permission %s, %s' % (args[1], args[2]))
+        # logger.debug('Check Permission %s, %s' % (args[1], args[2]))
         return 0

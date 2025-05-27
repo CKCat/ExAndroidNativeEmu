@@ -1,4 +1,4 @@
-import logging
+from loguru import logger
 
 from ..const import emu_const
 
@@ -95,7 +95,7 @@ class MemorySyscallHandler:
         else:
             res = self._memory.map(addr, length, prot)
 
-        logging.debug("mmap return 0x%08X" % res)
+        logger.debug("mmap return 0x%08X" % res)
         return res
 
     def _handle_mmap(self, mu, addr, length, prot, flags, fd, offset):
@@ -131,7 +131,7 @@ class MemorySyscallHandler:
         else:
             res = self._memory.map(addr, length, prot)
 
-        logging.debug("mmap return 0x%016X" % res)
+        logger.debug("mmap return 0x%016X" % res)
         return res
 
     def _handle_madvise(self, mu, start, len_in, behavior):

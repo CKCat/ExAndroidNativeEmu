@@ -1,7 +1,6 @@
-import logging
-import sys
 import traceback
 
+from loguru import logger
 from unicorn import UC_HOOK_CODE, UC_PROT_EXEC, UC_PROT_READ, UC_PROT_WRITE
 from unicorn.arm64_const import (
     UC_ARM64_REG_PC,
@@ -84,9 +83,8 @@ class FuncHooker:
             # Make sure we catch exceptions inside hooks and stop emulation.
             mu.emu_stop()
             traceback.print_exc()
-            logging.exception("catch error on _hook")
-            sys.exit(-1)
-            raise
+            logger.exception("catch error on _hook")
+            raise "catch error on _hook"
 
     def __init__(self, emu):
         self.__emu = emu
@@ -112,7 +110,7 @@ class FuncHooker:
             if address not in self.__hook_params:
                 return
 
-            logging.debug("trigger hook on 0x%08X" % address)
+            logger.debug("trigger hook on 0x%08X" % address)
             hook_param = self.__hook_params[address]
             nargs = hook_param[0]
             args = native_read_args_in_hook_code(self.__emu, nargs)
@@ -189,9 +187,8 @@ class FuncHooker:
             # Make sure we catch exceptions inside hooks and stop emulation.
             mu.emu_stop()
             traceback.print_exc()
-            logging.exception("catch error on _hook")
-            sys.exit(-1)
-            raise
+            logger.exception("catch error on _hook")
+            raise "catch error on _hook"
 
     def fun_hook(self, fun_addr, nargs, cb_before, cb_after):
         fun_addr = standlize_addr(fun_addr)

@@ -2,8 +2,8 @@ import re
 
 
 def convert(name):
-    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+    s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
+    return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
 
 
 table = """NULL,
@@ -294,18 +294,21 @@ for entry in table.split("\n"):
     func_name = convert(entry)
     index += 1
 
-    if entry == 'NULL':
+    if entry == "NULL":
         continue
 
     functions[func_index] = func_name
 
 # write_function_table entries
-for (index, name) in functions.items():
+for index, name in functions.items():
     print("            %d: self.%s," % (index, name))
 
 # write functions
-for (index, name) in functions.items():
-    print("""
+for index, name in functions.items():
+    print(
+        """
     @native_method
     def %s(self, mu, env):
-        raise NotImplementedError()""" % name)
+        raise NotImplementedError()"""
+        % name
+    )

@@ -93,28 +93,7 @@ def dump_registers(emu, fd):
         lr = mu.reg_read(UC_ARM_REG_LR)
         pc = mu.reg_read(UC_ARM_REG_PC)
         cpsr = mu.reg_read(UC_ARM_REG_CPSR)
-        regs = (
-            "\tR0=0x%08X,R1=0x%08X,R2=0x%08X,R3=0x%08X,R4=0x%08X,R5=0x%08X,R6=0x%08X,R7=0x%08X,\n\tR8=0x%08X,R9=0x%08X,R10=0x%08X,R11=0x%08X,R12=0x%08X\n\tLR=0x%08X,PC=0x%08X, SP=0x%08X,CPSR=0x%08X"
-            % (
-                r0,
-                r1,
-                r2,
-                r3,
-                r4,
-                r5,
-                r6,
-                r7,
-                r8,
-                r9,
-                r10,
-                r11,
-                r12,
-                lr,
-                pc,
-                sp,
-                cpsr,
-            )
-        )
+        regs = f"\tR0=0x{r0:08X},R1=0x{r1:08X},R2=0x{r2:08X},R3=0x{r3:08X},R4=0x{r4:08X},R5=0x{r5:08X},R6=0x{r6:08X},R7=0x{r7:08X},\n\tR8=0x{r8:08X},R9=0x{r9:08X},R10=0x{r10:08X},R11=0x{r11:08X},R12=0x{r12:08X}\n\tLR=0x{lr:08X},PC=0x{pc:08X}, SP=0x{sp:08X},CPSR=0x{cpsr:08X}"
     else:
         # arm64
         x0 = mu.reg_read(UC_ARM64_REG_X0)
@@ -133,27 +112,7 @@ def dump_registers(emu, fd):
         sp = mu.reg_read(UC_ARM64_REG_SP)
         x30 = mu.reg_read(UC_ARM64_REG_X30)
         pc = mu.reg_read(UC_ARM64_REG_PC)
-        regs = (
-            "\tX0=0x%016X,X1=0x%016X,X2=0x%016X,X3=0x%016X,X4=0x%016X,X5=0x%016X,X6=0x%016X,X7=0x%016X,\n\tX8=0x%016X,X9=0x%016X,X10=0x%016X,X11=0x%016X,X12=0x%016X\n\tLR=0x%016X,PC=0x%016X, SP=0x%016X"
-            % (
-                x0,
-                x1,
-                x2,
-                x3,
-                x4,
-                x5,
-                x6,
-                x7,
-                x8,
-                x9,
-                x10,
-                x11,
-                x12,
-                x30,
-                pc,
-                sp,
-            )
-        )
+        regs = f"\tX0=0x{x0:016X},X1=0x{x1:016X},X2=0x{x2:016X},X3=0x{x3:016X},X4=0x{x4:016X},X5=0x{x5:016X},X6=0x{x6:016X},X7=0x{x7:016X},\n\tX8=0x{x8:016X},X9=0x{x9:016X},X10=0x{x10:016X},X11=0x{x11:016X},X12=0x{x12:016X}\n\tLR=0x{x30:016X},PC=0x{pc:016X}, SP=0x{sp:016X}"
 
     fd.write(regs + "\n")
 
@@ -227,18 +186,10 @@ def dump_code(
         tid = ""
         if emu.get_muti_task_support():
             sch = emu.get_schduler()
-            tid = "%d:" % sch.get_current_tid()
-        line = "%s(%20s[0x%08X])[%-12s]0x%08X:\t%s\t%s" % (
-            tid,
-            name,
-            base,
-            instruction_str,
-            addr - base,
-            i.mnemonic.upper(),
-            i.op_str.upper(),
-        )
+            tid = f"{sch.get_current_tid()}:"
+        line = f"{tid}({name}[0x{base:08X}])[0x{addr - base:08X}]:\t{instruction_str}\t{i.mnemonic.upper()} {i.op_str.upper()}"
         if funName is not None:
-            line = line + " ; %s" % funName
+            line = line + f" ; {funName}"
 
         regs = i.regs_access()
         if DUMP_REG_READ == dump_reg_type:
@@ -249,25 +200,25 @@ def dump_code(
         regs_io = io.StringIO()
         for rid in regs_dump:
             reg_name = i.reg_name(rid).lower()
-            reg_value = uc_regs.get(reg_name, 0)
-            if reg_value == 0:
+            reg_index = uc_regs.get(reg_name, -1)
+            if reg_index == -1:
                 logger.warning(f"unknown register {reg_name}.")
                 continue
-            reg_value = mu.reg_read(reg_value)
+            reg_value = mu.reg_read(reg_index)
             reg_str = f"{reg_name}=0x{reg_value:08X} "
             regs_io.write(reg_str)
 
         regs = regs_io.getvalue()
         if regs != "":
-            line = "%s\t;(%s)" % (line, regs)
+            line = f"{line}\t;({regs})"
 
         fd.write(line + "\n")
 
 
-def dump_stack(emu, fd, max_deep=512):
+def dump_stack(emu: Emulator, fd, max_deep=512):
     mu = emu.mu
     sp = 0
-    if emu.get_arch() == emu_const.ARCH_ARM32():
+    if emu.get_arch() == emu_const.ARCH_ARM32:
         sp = mu.reg_read(UC_ARM_REG_SP)
     else:
         sp = mu.reg_read(UC_ARM64_REG_SP)
@@ -277,5 +228,5 @@ def dump_stack(emu, fd, max_deep=512):
     for ptr in range(sp, stop, ptr_sz):
         valb = mu.mem_read(ptr, ptr_sz)
         val = int.from_bytes(valb, byteorder="little", signed=False)
-        line = "0x%08X: 0x%08X\n" % (ptr, val)
+        line = f"0x{ptr:08X}: 0x{val:08X}\n"
         fd.write(line)

@@ -1,3 +1,5 @@
+from loguru import logger
+
 from ..java_class_def import JavaClassDef
 from ..java_method_def import java_method_def
 from .bundle import Bundle
@@ -24,7 +26,7 @@ class ContentResolver(
         native=False,
     )
     def call(self, emu, uri, method, arg, extras):
-        print("call %r %r %r %r" % (uri, method, arg, extras))
+        logger.debug(f"call {uri} {method} {arg} {extras}")
         pyuri_str = uri.get_py_string()
         py_method = method.get_py_string()
         py_arg = arg.get_py_string()

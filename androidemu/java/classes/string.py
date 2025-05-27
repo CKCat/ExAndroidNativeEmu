@@ -18,11 +18,9 @@ class String(metaclass=JavaClassDef, jvm_name="java/lang/String"):
         native=False,
     )
     def ctor(self, emu, barr, charset):
-        # print("%r %r"%(barr, charset))
         pyarr = barr.get_py_items()
         pystr = charset.get_py_string()
         self.__str = pyarr.decode(pystr)
-        # print(self.__str)
 
     @java_method_def(
         name="getBytes",

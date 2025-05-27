@@ -1,6 +1,6 @@
-import logging
 import os
 
+from loguru import logger
 from unicorn import UC_ERR_MAP, UC_PROT_READ, UC_PROT_WRITE, UcError
 
 from ..utils.misc_utils import page_end
@@ -78,7 +78,7 @@ class MemoryMap:
                         % (map_base, self._alloc_min_addr, self._alloc_max_addr)
                     )
 
-                logging.debug(
+                logger.debug(
                     "before mem_map addr:0x%08X, sz:0x%08X" % (map_base, size)
                 )
 
@@ -116,9 +116,8 @@ class MemoryMap:
         except UcError:
             # impossible
             for r in self.__mu.mem_regions():
-                print(
-                    "region begin :0x%08X end:0x%08X, prot:%d"
-                    % (r[0], r[1], r[2])
+                logger.debug(
+                    f"region begin :0x{r[0]:08X} end:0x{r[1]:08X}, prot:{r[2]}"
                 )
 
             raise
@@ -156,9 +155,8 @@ class MemoryMap:
                 % (address, PAGE_SIZE)
             )
 
-        logging.debug(
-            "map addr:0x%08X, end:0x%08X, sz:0x%08X off=0x%08X"
-            % (address, address + size, size, offset)
+        logger.debug(
+            f"map addr:0x{address:08X}, end:0x{address + size:08X}, sz:0x{size:08X} off=0x{offset:08X}"
         )
         # traceback.print_stack()
         al_address = address
@@ -182,11 +180,9 @@ class MemoryMap:
             # logging.debug("mmap file ori_off %d"%(ori_off,))
             os.lseek(vf.descriptor, offset, os.SEEK_SET)
             data = self.__read_fully(vf.descriptor, size)
-            logging.debug(
-                "read for offset %d sz %d data sz:%d"
-                % (offset, size, len(data))
+            logger.debug(
+                f"read for offset {offset} sz {size} data sz:{len(data)}"
             )
-            # print("data:%r"%data)
             self.__mu.mem_write(res_addr, data)
             self.__file_map_addr[res_addr] = (res_addr + al_size, offset, vf)
             os.lseek(vf.descriptor, ori_off, os.SEEK_SET)
@@ -205,9 +201,8 @@ class MemoryMap:
             self.__mu.mem_protect(addr, len_in, prot)
         except UcError:
             # TODO:just for debug
-            logging.warning(
-                "Warning mprotect with addr: 0x%08X len: 0x%08X prot:0x%08X failed!!!"
-                % (addr, len, prot)
+            logger.warning(
+                f"Warning mprotect with addr: 0x{addr:08X} len: 0x{len:08X} prot:0x{prot:08X} failed!!!"
             )
             # self.dump_maps(sys.stdout)
             # raise
@@ -224,16 +219,14 @@ class MemoryMap:
 
         size = page_end(addr + size) - addr
         try:
-            logging.debug(
-                "unmap 0x%08X sz=0x0x%08X end=0x0x%08X"
-                % (addr, size, addr + size)
+            logger.debug(
+                f"unmap 0x{addr:08X} sz=0x{size:08X} end=0x{addr + size:08X}"
             )
             if addr in self.__file_map_addr:
                 file_map_attr = self.__file_map_addr[addr]
                 if addr + size != file_map_attr[0]:
                     raise RuntimeError(
-                        "unmap error, range 0x%08X-0x%08X does not match file map range 0x%08X-0x%08X from file %s"
-                        % (addr, addr + size, addr, file_map_attr[0], "")
+                        f"unmap error, range 0x{addr:08X}-0x{addr + size:08X} does not match file map range 0x{addr:08X}-0x{file_map_attr[0]:08X} from file {file_map_attr[2].name}"
                     )
 
                 self.__file_map_addr.pop(addr)
@@ -244,9 +237,8 @@ class MemoryMap:
             # TODO:just for debug
 
             for r in self.__mu.mem_regions():
-                print(
-                    "region begin :0x%08X end:0x%08X, prot:%d"
-                    % (r[0], r[1], r[2])
+                logger.exception(
+                    f"region begin :0x{r[0]:08X} end:0x{r[1]:08X}, prot:{r[2]}"
                 )
 
             raise
@@ -268,7 +260,7 @@ class MemoryMap:
         r = "r" if region[2] & 0x1 else "-"
         w = "w" if region[2] & 0x2 else "-"
         x = "x" if region[2] & 0x4 else "-"
-        prot = "%s%s%sp" % (r, w, x)
+        prot = f"{r}{w}{x}"
         off, name = self.__get_map_attr(region[0], region[1] + 1)
         return (region[0], region[1] + 1, prot, off, name)
 
@@ -282,7 +274,7 @@ class MemoryMap:
 
         """
         for region in regions:
-            print("region begin :0x%08X end:0x%08X, prot:%d"%(region[0], region[1], region[2]))
+            logger.debug(f"region begin :0x{region[0]:08X} end:0x{region[1]:08X}, prot:{region[2]}")
         """
 
         n = len(regions)
