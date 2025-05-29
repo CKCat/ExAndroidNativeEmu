@@ -23,7 +23,7 @@ class JNIEnv:
         self._emu = emu
         self._class_loader = class_loader
         self._locals = ReferenceTable(start=1, max_entries=2048)
-        self._globals = ReferenceTable(start=4096, max_entries=512000)
+        self._globals = ReferenceTable(start=4096, max_entries=512000000)
         arch = emu.get_arch()
         if arch == emu_const.ARCH_ARM32:
             self.__read_args = self.__read_args32
@@ -1834,11 +1834,14 @@ class JNIEnv:
         logger.debug(f"GetStringUtfChars({string}, {is_copy_ptr}) was called")
 
         str_ref = self.get_reference(string)
-        str_obj = str_ref.value
-        if str_obj == JAVA_NULL:
-            return JAVA_NULL
+        if isinstance(str_ref.value, String):
+            str_obj = str_ref.value
+            if str_obj == JAVA_NULL:
+                return JAVA_NULL
 
-        str_val = str_obj
+            str_val = str_obj.get_py_string()
+        else:
+            str_val = str_ref.value
         # FIXME use malloc
         str_ptr = self._emu.memory.map(
             0, len(str_val) + 1, UC_PROT_READ | UC_PROT_WRITE

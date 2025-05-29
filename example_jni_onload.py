@@ -1,3 +1,4 @@
+import base64
 import posixpath
 import sys
 
@@ -73,6 +74,22 @@ class MainActivity(
     def sayHello(self, mu, content):
         pass
 
+class Encrypt(
+    metaclass=JavaClassDef, jvm_name="org/ckcat/uniron/Encrypt"
+):
+    def __init__(self):
+        pass
+
+    @java_method_def(
+        name="base64",
+        signature="(Ljava/lang/String;)Ljava/lang/String;",
+        native=False,
+        args_list=['jstring']
+    )
+    def base64(self, *args, **argv):
+        print(f"{args} {argv}")
+        # content = base64.b64encode(args[0].value)
+        return "hello base64"
 
 if __name__ == "__main__":
     # 初始化emulator
@@ -84,6 +101,7 @@ if __name__ == "__main__":
     logger.debug("Loaded vfs.")
     # 注册 MainActivity 类
     emulator.java_classloader.add_class(MainActivity)
+    emulator.java_classloader.add_class(Encrypt)
     emulator.mu.hook_add(UC_HOOK_CODE, hook_code, emulator)
 
     emulator.mu.hook_add(UC_HOOK_MEM_WRITE, hook_mem_write)
@@ -91,7 +109,7 @@ if __name__ == "__main__":
 
     logger.info("Register native methods.")
     # Load all libraries.
-    lib_module = emulator.load_library("tests/bin64/libuniron.so")
+    lib_module = emulator.load_library("libuniron.so")
 
     # androidemu.utils.debug_utils.dump_symbols(emulator, sys.stdout)
 
@@ -112,16 +130,15 @@ if __name__ == "__main__":
             emulator,
             "Hello ExAndroidNativeEmu",
         )
-        retult = emulator.java_vm.jni_env.get_local_reference(retult)
         logger.info(f"resutl: {retult}")
-        retult = emulator.call_native(
-            lib_module.base + 0xACC,
-            emulator.java_vm.jni_env.address_ptr,
-            0x00,
-            "Hello ExAndroidNativeEmu",
-        )
-        retult = emulator.java_vm.jni_env.get_local_reference(retult)
-        logger.info(f"resutl: {retult.value}")
+        # retult = emulator.call_native(
+        #     lib_module.base + 0xACC,
+        #     emulator.java_vm.jni_env.address_ptr,
+        #     0x00,
+        #     "Hello ExAndroidNativeEmu",
+        # )
+        # retult = emulator.java_vm.jni_env.get_local_reference(retult)
+        # logger.info(f"resutl: {retult.value}")
 
         # Dump natives found.
         logger.info("Exited EMU.")
