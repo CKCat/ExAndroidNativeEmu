@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING
 
+from loguru import logger
 from unicorn.arm64_const import (
     UC_ARM64_REG_SP,
     UC_ARM64_REG_X0,
@@ -85,7 +86,9 @@ def native_read_args_in_hook_code(emu: "Emulator", args_count: int):
     mu = emu.mu
 
     for i in range(0, nreg):
-        native_args.append(mu.reg_read(reg_base + i))
+        reg_value = mu.reg_read(reg_base + i)
+        logger.debug(f"NativeMethod read arg {i}: 0x{reg_value:08X}")
+        native_args.append(reg_value)
 
     if args_count > max_regs_args:
         sp = mu.reg_read(sp_reg)
@@ -121,7 +124,9 @@ def native_translate_arg(emu: "Emulator", val):
 
 
 def native_write_arg_register(emu: "Emulator", reg: int, val):
-    emu.mu.reg_write(reg, native_translate_arg(emu, val))
+    reg_value = native_translate_arg(emu, val)
+    logger.debug(f"native_write_arg_register  arg {reg}: 0x{reg_value:08X}")
+    emu.mu.reg_write(reg, reg_value)
 
 
 # 定义 native 层回调到 python 的方法

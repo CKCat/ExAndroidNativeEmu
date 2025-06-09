@@ -478,7 +478,7 @@ class JNIEnv:
                 obj = None
                 if jobj is None:
                     logger.warning(
-                        f"arg_name {arg_name} ref {ref} is not vaild maybe wrong arglist"
+                        f"arg_name {arg_name} ref 0x{ref:08X} is not vaild maybe wrong arglist"
                     )
                     obj = JAVA_NULL
                 else:
@@ -1394,7 +1394,8 @@ class JNIEnv:
         name = memory_helpers.read_utf8(mu, name_ptr)
         sig = memory_helpers.read_utf8(mu, sig_ptr)
         clazz = self.get_reference(clazz_idx)
-
+        if name == 'base64':
+            logger.debug("base64")
         logger.debug(
             "JNIEnv->GetStaticMethodId(%d, %s, %s) was called"
             % (clazz_idx, name, sig)
@@ -1446,8 +1447,7 @@ class JNIEnv:
             )
 
         logger.debug(
-            "JNIEnv->CallStaticXXXMethodX(%s, %s <%s>, %r) was called"
-            % (pyclazz.jvm_name, method.name, method.signature, args)
+            f"JNIEnv->CallStaticXXXMethodX({pyclazz.jvm_name}, {method.name} <{method.signature}>, 0x{args:08X}) was called"
         )
 
         # Parse arguments.
