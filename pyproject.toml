@@ -1,0 +1,14 @@
+[project]
+name = "exandroidnativeemu"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "capstone>=5.0.6",
+    "hexdump>=3.3",
+    "keystone-engine>=0.9.2",
+    "loguru>=0.7.3",
+    "pyelftools>=0.32",
+    "unicorn>=2.1.3",
+]
