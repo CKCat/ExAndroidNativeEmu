@@ -112,7 +112,7 @@ class Emulator:
             # 获取所有的 java 类
             clsList = inspect.getmembers(m, inspect.isclass)
             for name, clz in clsList:
-                if type(clz) == JavaClassDef:
+                if type(clz) is JavaClassDef:
                     preload_classes.add(clz)
 
         for clz in preload_classes:
@@ -349,6 +349,7 @@ class Emulator:
         assert addr is not None, (
             "call addr is None, make sure your jni native function has registered by RegisterNative!"
         )
+        logger.debug(argv)
         native_write_args(self, *argv)
         self.__sch.exec(addr)
         # Read result from locals if jni.

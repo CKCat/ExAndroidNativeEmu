@@ -7,7 +7,7 @@ from unicorn.arm64_const import (
     UC_ARM64_REG_SP,
     UC_ARM64_REG_TPIDR_EL0,
     UC_ARM64_REG_X0,
-    UC_ARM64_REG_X30,
+    UC_ARM64_REG_X30, UC_ARM64_REG_X3, UC_ARM64_REG_X2,
 )
 from unicorn.arm_const import (
     UC_ARM_REG_C13_C0_3,
@@ -197,6 +197,7 @@ class Scheduler:
             self.__emu.mu.reg_write(UC_ARM64_REG_X30, self.__stop_pos)
 
         while True:
+            logger.debug(f"ordered_tasks_list {self.__ordered_tasks_list}")
             for tid in reversed(self.__ordered_tasks_list):
                 task = self.__tasks_map[tid]
                 if tid in self.__blocking_set:
@@ -244,11 +245,13 @@ class Scheduler:
                 start_pos = 0
                 if task.is_main:
                     if task.is_init:
+                        logger.debug(f"main_entry: {main_entry}")
                         start_pos = main_entry
                         task.is_init = False
 
                     else:
                         # 上下文切换
+                        logger.debug(f"上下文切换: {task.context}")
                         self.__emu.mu.context_restore(task.context)
                         start_pos = self.__get_interrupted_entry()
 
@@ -269,10 +272,14 @@ class Scheduler:
 
                 # 加上uc timeout参数有bug，会随机崩溃，这个机制是uc内部使用多线程实现的，但uc对象根本不是线程安全的，指令数可以加，但是很慢
                 # 第四个参数传100执行arm64的android6 libc会触发bug，具体原因见hooker.py FIXME注释
+                x3 = self.__emu.mu.reg_read(UC_ARM64_REG_X3)
+                x2 = self.__emu.mu.reg_read(UC_ARM64_REG_X2)
+                logger.debug(f"emu_start start pos {start_pos:08X}, stop_pos {self.__stop_pos:08X},x2 = {x2:08X}, x3 = {x3:08X}")
                 self.__emu.mu.emu_start(start_pos, self.__stop_pos, 0, 0)
                 task.halt_ts = int(time.time() * 1000)
                 # after run
                 ctx = self.__emu.mu.context_save()
+                logger.debug(f"task.context {task.context}")
                 task.context = ctx
 
                 # 运行结束，任务标记成可删除

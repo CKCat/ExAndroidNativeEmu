@@ -11,7 +11,7 @@ from unicorn.arm64_const import (
 )
 from unicorn.arm_const import UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_SP
 
-from ...const import emu_const
+from ...const import emu_const, map_reg
 from ..java_class_def import JavaClassDef
 from ..jni_ref import jbyteArray, jclass, jobject, jobjectArray, jstring
 
@@ -87,7 +87,8 @@ def native_read_args_in_hook_code(emu: "Emulator", args_count: int):
 
     for i in range(0, nreg):
         reg_value = mu.reg_read(reg_base + i)
-        logger.debug(f"NativeMethod read arg {i}: 0x{reg_value:08X}")
+        reg_str = map_reg.arm64_const_to_str_map.get(reg_base + i)
+        logger.debug(f"NativeMethod read {reg_str}: 0x{reg_value:08X}")
         native_args.append(reg_value)
 
     if args_count > max_regs_args:
@@ -125,7 +126,8 @@ def native_translate_arg(emu: "Emulator", val):
 
 def native_write_arg_register(emu: "Emulator", reg: int, val):
     reg_value = native_translate_arg(emu, val)
-    logger.debug(f"native_write_arg_register  arg {reg}: 0x{reg_value:08X}")
+    reg_str = map_reg.arm64_const_to_str_map.get(reg)
+    logger.debug(f"native_write_arg_register {reg_str}: 0x{reg_value:08X}")
     emu.mu.reg_write(reg, reg_value)
 
 
@@ -154,7 +156,6 @@ def native_method(func):
         if len(argv) == 1:  # 从寄存器取参数
             result = func(mu, *native_args)
         else:
-            le = len(native_args)
             result = func(argv[0], mu, *native_args)
 
         ret_reg0 = UC_ARM_REG_R0
