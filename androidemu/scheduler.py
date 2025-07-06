@@ -7,7 +7,10 @@ from unicorn.arm64_const import (
     UC_ARM64_REG_SP,
     UC_ARM64_REG_TPIDR_EL0,
     UC_ARM64_REG_X0,
-    UC_ARM64_REG_X30, UC_ARM64_REG_X3, UC_ARM64_REG_X2,
+    UC_ARM64_REG_X1,
+    UC_ARM64_REG_X2,
+    UC_ARM64_REG_X3,
+    UC_ARM64_REG_X30,
 )
 from unicorn.arm_const import (
     UC_ARM_REG_C13_C0_3,
@@ -274,7 +277,14 @@ class Scheduler:
                 # 第四个参数传100执行arm64的android6 libc会触发bug，具体原因见hooker.py FIXME注释
                 x3 = self.__emu.mu.reg_read(UC_ARM64_REG_X3)
                 x2 = self.__emu.mu.reg_read(UC_ARM64_REG_X2)
-                logger.debug(f"emu_start start pos {start_pos:08X}, stop_pos {self.__stop_pos:08X},x2 = {x2:08X}, x3 = {x3:08X}")
+                x1 = self.__emu.mu.reg_read(UC_ARM64_REG_X1)
+                x0 = self.__emu.mu.reg_read(UC_ARM64_REG_X0)
+                logger.debug(
+                    f"emu_start start pos {start_pos:08X}, stop_pos {self.__stop_pos:08X}"
+                )
+                logger.debug(
+                    f"x0 = {x0:08X}, x1 = {x1:08X}, x2 = {x2:08X}, x3 = {x3:08X}"
+                )
                 self.__emu.mu.emu_start(start_pos, self.__stop_pos, 0, 0)
                 task.halt_ts = int(time.time() * 1000)
                 # after run

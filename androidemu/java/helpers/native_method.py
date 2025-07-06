@@ -70,7 +70,7 @@ def native_read_args_in_hook_code(emu: "Emulator", args_count: int):
     max_regs_args = 4  # 寄存器参数个数
     reg_base = UC_ARM_REG_R0
     sp_reg = UC_ARM_REG_SP
-
+    logger.debug(f"args_count = {args_count}")
     if emu.get_arch() == emu_const.ARCH_ARM64:
         max_regs_args = 8
         reg_base = UC_ARM64_REG_X0

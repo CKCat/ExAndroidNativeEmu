@@ -1,18 +1,19 @@
+import base64
 import posixpath
 import sys
 
+import capstone
+import unicorn
 from loguru import logger
 from unicorn import (
     UC_HOOK_CODE,
     UC_HOOK_MEM_READ,
     UC_HOOK_MEM_WRITE,
-    UC_PROT_EXEC,
     UcError,
 )
 from unicorn.arm64_const import UC_ARM64_REG_X3
 from unicorn.arm_const import UC_ARM_REG_PC
 
-import androidemu.utils.debug_utils
 from androidemu.const import emu_const
 from androidemu.emulator import Emulator
 from androidemu.java.classes.string import String
@@ -23,22 +24,56 @@ from androidemu.utils.chain_log import ChainLogger
 g_cfd = ChainLogger(sys.stderr, "./ins-jni.txt")
 
 
+def print_arm64_regs(mu):
+    regs = ["X0", "X1", "X2", "X3", "X29", "SP"]
+    count = 0
+    output = ""
+    for reg in regs:
+        val = mu.reg_read(getattr(unicorn.arm64_const, f"UC_ARM64_REG_{reg}"))
+        if count < 8:
+            output += f"{reg} = 0x{val:x}\t"
+            count += 1
+        else:
+            output += f"\n{reg} = 0x{val:x}\t"
+            count = 0
+    print(output)
+
+
 # Add debugging.
 def hook_code(mu, address, size, user_data):
     try:
-        emu = user_data
-        x3 = emu.mu.reg_read(UC_ARM64_REG_X3)
-        if x3 == 0x100FD590:
-            logger.debug(f"0x{address:08X} UC_ARM64_REG_X3 == 0x100FD590")
-        if not emu.memory.check_addr(address, UC_PROT_EXEC):
-            logger.error("addr 0x%08X out of range" % (address,))
-            sys.exit(-1)
-        #
-        # androidemu.utils.debug_utils.dump_registers(mu, sys.stdout)
-        androidemu.utils.debug_utils.dump_code(emu, address, size, g_cfd)
-    except Exception:
-        logger.exception("exception in hook_code")
-        sys.exit(-1)
+        if 0xCBBCBC8C <= address <= 0xCBBCBD6C:
+            print_arm64_regs(mu)
+            code = mu.mem_read(address, size)
+            CP = capstone.Cs(capstone.CS_ARCH_ARM64, capstone.CS_MODE_ARM)
+            for i in CP.disasm(code, 0, size):
+                print(f"0x{address:08X}: {i.mnemonic}: {i.op_str}")
+            if address == 0xCBBCBD48:
+                x3 = mu.reg_read(UC_ARM64_REG_X3)
+                data = mu.mem_read(x3, 8)
+                logger.debug(
+                    f"0x{x3:08X}: __stack: {int.from_bytes(data, 'little'):08X}"
+                )
+                data = mu.mem_read(x3 + 8, 8)
+                addr = int.from_bytes(data, "little")
+                data = mu.mem_read(addr, 8)
+                logger.debug(
+                    f"0x{x3:08X}: __gr_top: {int.from_bytes(data, 'little'):08X}"
+                )
+                data = mu.mem_read(x3 + 8 * 2, 8)
+                logger.debug(
+                    f"0x{x3:08X}: __vr_top: {int.from_bytes(data, 'little'):08X}"
+                )
+                data = mu.mem_read(x3 + 8 * 3, 4)
+                logger.debug(
+                    f"0x{x3:08X}: __gr_offs: {int.from_bytes(data, 'little'):08X}"
+                )
+                data = mu.mem_read(x3 + 8 * 3 + 4, 4)
+                logger.debug(
+                    f"0x{x3:08X}: __vr_offs: {int.from_bytes(data, 'little'):08X}"
+                )
+    except Exception as e:
+        logger.error(e)
 
 
 def hook_mem_read(uc, access, address, size, value, user_data):
@@ -91,8 +126,13 @@ class Encrypt(metaclass=JavaClassDef, jvm_name="org/ckcat/uniron/Encrypt"):
     )
     def base64(self, *args, **argv):
         print(f"{args} {argv}")
-        # content = base64.b64encode(args[0].value)
-        return String("hello base64")
+        jstr = args[0]
+        str_content = jstr.get_py_string()
+        print(str_content)
+        content = base64.b64encode(str_content.encode("utf8"))
+        result = content.decode("utf8")
+        print(result)
+        return result
 
 
 if __name__ == "__main__":
@@ -134,16 +174,17 @@ if __name__ == "__main__":
             emulator,
             String("Hello ExAndroidNativeEmu"),
         )
+        # sub_C8C 出现了异常
         logger.info(f"resutl: {retult}")
-        # 通过偏移调用
-        retult = emulator.call_native(
-            lib_module.base + 0xB54,
-            emulator.java_vm.jni_env.address_ptr,
-            0x00,
-            String("Hello ExAndroidNativeEmu"),
-        )
-        retult = emulator.java_vm.jni_env.get_local_reference(retult)
-        logger.info(f"resutl: {retult.value}")
+        # # 通过偏移调用
+        # retult = emulator.call_native(
+        #     lib_module.base + 0xB54,
+        #     emulator.java_vm.jni_env.address_ptr,
+        #     0x00,
+        #     String("Hello ExAndroidNativeEmu"),
+        # )
+        # retult = emulator.java_vm.jni_env.get_local_reference(retult)
+        # logger.info(f"resutl: {retult.value}")
 
         # Dump natives found.
         logger.info("Exited EMU.")

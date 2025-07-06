@@ -1,5 +1,7 @@
+import ctypes
+
 from loguru import logger
-from unicorn import UC_PROT_READ, UC_PROT_WRITE
+from unicorn import UC_PROT_READ, UC_PROT_WRITE, Uc, UcError
 
 from androidemu.hooker import Hooker
 from androidemu.java.java_classloader import JavaClassLoader
@@ -15,6 +17,70 @@ from .helpers.native_method import native_method
 from .jni_const import JNI_FALSE, JNI_OK, JNI_TRUE
 from .jni_ref import jclass, jobject
 from .reference_table import ReferenceTable
+
+
+# AArch64 的 __gnuc_va_list 结构
+class VaListAArch64(ctypes.Structure):
+    _fields_ = [
+        # 对应 C 结构中的 __stack, __gr_top, __vr_top, __gr_offs, __vr_offs
+        # ctypes 会自动处理对齐
+        ("__stack", ctypes.c_uint64),  # 指向栈上第一个变长参数的地址
+        ("__gr_top", ctypes.c_uint64),  # 指向 GPR 寄存器保存区的顶部
+        ("__vr_top", ctypes.c_uint64),  # 指向 VR 寄存器保存区的顶部
+        (
+            "__gr_offs",
+            ctypes.c_int32,
+        ),  # 从 __gr_top 开始，下一个 GPR 参数的负偏移量
+        (
+            "__vr_offs",
+            ctypes.c_int32,
+        ),  #  从 __vr_top 开始，下一个 VR 参数的负偏移量
+    ]
+
+
+def get_next_int_arg(uc: Uc, va_list_addr: int):
+    """
+    模拟 va_arg(ap, int/pointer) 的行为
+    :param uc: Unicorn 实例
+    :param va_list_addr: __va_list 结构体在模拟内存中的地址
+    :return: (下一个参数的值, 是否成功)
+    """
+    try:
+        # 1. 从模拟内存中读取 va_list 结构体
+        logger.debug(f"va_list_addr: {va_list_addr:08X}")
+        va_list_data = uc.mem_read(va_list_addr, ctypes.sizeof(VaListAArch64))
+        va_list = VaListAArch64.from_buffer_copy(va_list_data)
+
+        arg_val = 0
+
+        # 2. 判断参数是在寄存器保存区还是在栈上
+        # 根据 AArch64 PCS，__gr_offs <= 0 表示还在寄存器区域
+        if va_list.__gr_offs <= -8:  # 用 <= -8 更严谨，因为一个寄存器是8字节
+            # 参数在寄存器保存区
+            # 计算参数地址: __gr_top + __gr_offs
+            arg_addr = va_list.__gr_top + va_list.__gr_offs
+            arg_val = int.from_bytes(uc.mem_read(arg_addr, 8), "little")
+
+            # 3. 更新 va_list 的状态 (非常重要！)
+            va_list.__gr_offs += 8
+        else:
+            # 参数在栈上
+            # 栈上参数地址就是 __stack 指针
+            arg_addr = va_list.__stack
+            arg_val = int.from_bytes(uc.mem_read(arg_addr, 8), "little")
+
+            # 3. 更新 va_list 的状态 (非常重要！)
+            # 下一个栈参数地址需要增加
+            va_list.__stack += 8
+
+        # 4. 将更新后的 va_list 写回模拟内存
+        uc.mem_write(va_list_addr, bytes(va_list))
+
+        return arg_val
+
+    except UcError as e:
+        logger.error(f"[*] Unicorn Error while fetching arg: {e}")
+        return -1
 
 
 # 这个类试图模拟 JNINativeInterface table.
@@ -421,7 +487,7 @@ class JNIEnv:
             return result
 
         for arg_name in args_type_list:
-            # 使用指针arg_ptr的作为call_xxx_v第四个参数,不会出现跳过第四个参数的情况,因为arg_ptr总是四个字节
+            # 使用指针 arg_ptr 的作为call_xxx_v第四个参数,不会出现跳过第四个参数的情况,因为arg_ptr总是四个字节
             v = int.from_bytes(mu.mem_read(args_ptr, 4), byteorder="little")
             if arg_name in ("jint", "jchar", "jbyte", "jboolean"):
                 result.append(v)
@@ -473,9 +539,10 @@ class JNIEnv:
                 result.append(v)
 
             elif arg_name == "jstring" or arg_name == "jobject":
-                ref = v
+                ref = get_next_int_arg(mu, args_ptr)
+                logger.debug(ref)
                 jobj = self.get_reference(ref)
-                obj = None
+                obj = JAVA_NULL
                 if jobj is None:
                     logger.warning(
                         f"arg_name {arg_name} ref 0x{ref:08X} is not vaild maybe wrong arglist"
@@ -1394,7 +1461,7 @@ class JNIEnv:
         name = memory_helpers.read_utf8(mu, name_ptr)
         sig = memory_helpers.read_utf8(mu, sig_ptr)
         clazz = self.get_reference(clazz_idx)
-        if name == 'base64':
+        if name == "base64":
             logger.debug("base64")
         logger.debug(
             "JNIEnv->GetStaticMethodId(%d, %s, %s) was called"
