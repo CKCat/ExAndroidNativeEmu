@@ -3,7 +3,7 @@ import random
 from loguru import logger
 from unicorn import UC_PROT_READ, UC_PROT_WRITE
 
-from ..const import emu_const
+from ..const import emu_const, soinfo as soinfo_const
 from ..java.helpers.native_method import native_method
 from ..utils import memory_helpers
 from .asset_mgr_hooks import AssetManagerHooks
@@ -40,23 +40,18 @@ class SymbolHooks:
             )
 
         modules.add_symbol_hook("rand", hooker.write_function(self.rand))
-        modules.add_symbol_hook(
-            "newlocale", hooker.write_function(self.newlocale)
-        )
+        modules.add_symbol_hook("newlocale", hooker.write_function(self.newlocale))
 
         modules.add_symbol_hook("abort", hooker.write_function(self.abort))
-        modules.add_symbol_hook(
-            "dlerror", hooker.write_function(self.nop("dlerror"))
-        )
+        modules.add_symbol_hook("dlerror", hooker.write_function(self.nop("dlerror")))
 
         asset_hooks = AssetManagerHooks(emu, modules, hooker, vfs_root)
         asset_hooks.register()
 
     @native_method
     def system_property_get(self, uc, name_ptr, buf_ptr):
-        # debug_utils.dump_registers(self._emu, sys.stdout)
         name = memory_helpers.read_utf8(uc, name_ptr)
-        logger.debug("Called __system_property_get(%s, 0x%x)" % (name, buf_ptr))
+        logger.debug(f"Called __system_property_get({name}, 0x{buf_ptr:x})")
 
         if name in self._emu.system_properties:
             p = self._emu.system_properties[name]
@@ -64,25 +59,22 @@ class SymbolHooks:
             memory_helpers.write_utf8(uc, buf_ptr, p)
             return nread
         else:
-            logger.warning(
-                "%s was not found in system_properties dictionary." % name
-            )
+            logger.warning(f"{name} was not found in system_properties dictionary.")
 
         return 0
 
     @native_method
     def dlopen(self, uc, path_str):
         path = memory_helpers.read_utf8(uc, path_str)
-        logger.debug("Called dlopen(%s)" % path)
+        logger.debug(f"Called dlopen({path})")
 
         r = 0
         if path.find("/") < 0:
-            # FIXME:重新考虑谁做vfs路径到android路径的转换关系
-            # 如果是libxxx.so这种字符串，则直接从
+            # 如果是libxxx.so这种字符串，则直接从modules中查找
             for mod in self._modules.modules:
                 if mod.filename.find(path) > -1:
                     r = mod.soinfo_ptr
-                    logger.debug("Called dlopen(%s) return 0x%08x" % (path, r))
+                    logger.debug(f"Called dlopen({path}) return 0x{r:08x}")
                     return r
 
         # redirect path on matter what path in vm runing
@@ -91,11 +83,10 @@ class SymbolHooks:
             mod = self._emu.load_library(fullpath)
             r = mod.soinfo_ptr
         else:
-            # raise RuntimeError("dlopen %s not found!!!"%path)
-            logger.debug("dlopen %s not found!!!" % path)
+            logger.debug(f"dlopen {path} not found!!!")
             r = 0
 
-        logger.debug("Called dlopen(%s) return 0x%08x" % (path, r))
+        logger.debug(f"Called dlopen({path}) return 0x{r:08x}")
         return r
 
     @native_method
@@ -104,20 +95,23 @@ class SymbolHooks:
         The function dlclose() decrements the reference count on the dynamic library handle handle.
         If the reference count drops to zero and no other loaded libraries use symbols in it, then the dynamic library is unloaded.
         """
-        logger.debug("Called dlclose(0x%x)" % handle)
+        logger.debug(f"Called dlclose(0x{handle:x})")
         return 0
 
     @native_method
     def dladdr(self, uc, addr, info_ptr):
-        logger.debug("Called dladdr(0x%x, 0x%x)" % (addr, info_ptr))
+        logger.debug(f"Called dladdr(0x{addr:x}, 0x{info_ptr:x})")
 
         for mod in self._modules.modules:
             if mod.base <= addr < mod.base + mod.size:
-                # FIXME: memory leak!!!
-                dli_fname = self._emu.memory.map(
-                    0, len(mod.filename) + 1, UC_PROT_READ | UC_PROT_WRITE
-                )
-                memory_helpers.write_utf8(uc, dli_fname, mod.filename)
+                if not hasattr(mod, "filename_ptr"):
+                    # 使用模拟器内存映射来存储文件名，避免内存泄漏 (cache on module)
+                    mod.filename_ptr = self._emu.memory.map(
+                        0, len(mod.filename) + 1, UC_PROT_READ | UC_PROT_WRITE
+                    )
+                    memory_helpers.write_utf8(uc, mod.filename_ptr, mod.filename)
+
+                dli_fname = mod.filename_ptr
                 memory_helpers.write_ptrs_sz(
                     uc,
                     info_ptr,
@@ -125,23 +119,17 @@ class SymbolHooks:
                     self._emu.get_ptr_size(),
                 )
                 logger.debug(
-                    "Called dladdr ok return path=%s base=0x%08x"
-                    % (mod.filename, mod.base)
-                )
-                logger.warning(
-                    "dladdr has memory leak, dli_fname can not free!!!"
+                    f"Called dladdr ok return path={mod.filename} base=0x{mod.base:08x}"
                 )
                 return 1
 
-        logger.debug(
-            "%s, %s Called dladdr not found" % (mod.filename, mod.base)
-        )
+        logger.debug(f"Called dladdr(0x{addr:x}) not found")
         return 0
 
     @native_method
     def dlsym(self, uc, handle, symbol):
         symbol_str = memory_helpers.read_utf8(uc, symbol)
-        logger.debug("Called dlsym(0x%x, %s)" % (handle, symbol_str))
+        logger.debug(f"Called dlsym(0x{handle:x}, {symbol_str})")
         global_handle = 0xFFFFFFFF
         if self._emu.get_arch() == emu_const.ARCH_ARM64:
             global_handle = 0
@@ -151,21 +139,24 @@ class SymbolHooks:
         else:
             soinfo = handle
             base = -1
-            # FIXME 这里写死偏移不好，需要修复
+
             if self._emu.get_arch() == emu_const.ARCH_ARM64:
                 base = memory_helpers.read_ptr_sz(
-                    uc, soinfo + 152, self._emu.get_ptr_size()
+                    uc,
+                    soinfo + soinfo_const.SOINFO_BASE_OFFSET_ARM64,
+                    self._emu.get_ptr_size(),
                 )
             else:
-                # soinfo+140 offset of load base in soinfo on android 4.4
                 base = memory_helpers.read_ptr_sz(
-                    uc, soinfo + 140, self._emu.get_ptr_size()
+                    uc,
+                    soinfo + soinfo_const.SOINFO_BASE_OFFSET_ARM32,
+                    self._emu.get_ptr_size(),
                 )
 
             module = self._modules.find_module(base)
 
             if module is None:
-                raise Exception("Module not found for address 0x%x" % symbol)
+                raise Exception(f"Module not found for address 0x{symbol:x}")
 
             sym = module.find_symbol(symbol_str)
 
@@ -173,9 +164,7 @@ class SymbolHooks:
         if sym is not None:
             r = sym
 
-        logger.debug(
-            "Called dlsym(0x%x, %s) return 0x%08X" % (handle, symbol_str, r)
-        )
+        logger.debug(f"Called dlsym(0x{handle:x}, {symbol_str}) return 0x{r:08X}")
         return r
 
     @native_method
@@ -188,9 +177,7 @@ class SymbolHooks:
 
     @native_method
     def pthread_create(self, uc, pthread_t_ptr, attr, start_routine, arg):
-        logger.warning(
-            "pthread_create called start_routine [0x%08X]" % (start_routine,)
-        )
+        logger.warning(f"pthread_create called start_routine [0x{start_routine:08X}]")
         # pthread_t结构体实际上只是一个long
         uc.mem_write(
             pthread_t_ptr,
@@ -225,6 +212,6 @@ class SymbolHooks:
     def nop(self, name):
         @native_method
         def nop_inside(emu):
-            raise NotImplementedError("Symbol hook not implemented %s" % name)
+            raise NotImplementedError(f"Symbol hook not implemented {name}")
 
         return nop_inside

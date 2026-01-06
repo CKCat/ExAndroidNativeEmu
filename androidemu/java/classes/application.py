@@ -9,4 +9,4 @@ class Application(
     jvm_super=ContextWrapper,
 ):
     def __init__(self):
-        pass
+        super().__init__()

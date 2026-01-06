@@ -22,6 +22,9 @@ BASE_ADDR = 0xCBBCB000
 
 WRITE_FSTAT_TIMES = True
 
+SIGRETURN_TRAMPOLINE_ADDR = 0xFE000000
+SIGRETURN_TRAMPOLINE_SIZE = 0x1000
+
 
 class Config:
     def __init__(self, cfg_path):
@@ -33,3 +36,6 @@ class Config:
         if key in self.__configs:
             return self.__configs[key]
         return def_val
+
+    def set(self, key, val):
+        self.__configs[key] = val

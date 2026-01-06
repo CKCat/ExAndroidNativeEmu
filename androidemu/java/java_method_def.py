@@ -5,10 +5,10 @@ import sys
 from loguru import logger
 
 from ..const import emu_const
-from .constant_values import JAVA_NULL
+from ..const.java_const import JAVA_NULL
 from .java_class_def import JavaClassDef
 from .jni_ref import jclass, jobject
-from .jvm_id_conter import next_method_id
+from .jvm_id_counter import next_method_id
 
 
 class JavaMethodDef:
@@ -40,7 +40,7 @@ def java_method_def(
     signature: str,
     native: bool = False,
     args_list=None,
-    modifier=None,
+    modifier=0,
     ignore: bool = False,
 ):
     """装饰器，用于注册 Java 方法"""

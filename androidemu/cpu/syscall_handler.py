@@ -1,6 +1,10 @@
+from dataclasses import dataclass
+from typing import Any, Callable
+
+
+@dataclass
 class SyscallHandler:
-    def __init__(self, idx: int, name: str, arg_count: int, callback: callable):
-        self.idx = idx
-        self.name = name
-        self.arg_count = arg_count
-        self.callback = callback
+    idx: int
+    name: str
+    arg_count: int
+    callback: Callable[..., Any]

@@ -43,10 +43,7 @@ class AssetManagerHooks:
 
     @native_method
     def __AAssetManager_fromJava(self, uc, env_ptr, jobj_mgr_idx):
-        logger.debug(
-            "AAssetManager_fromJava call [0x%08X], [%d]"
-            % (env_ptr, jobj_mgr_idx)
-        )
+        logger.debug(f"AAssetManager_fromJava call [0x{env_ptr:08X}], [{jobj_mgr_idx}]")
         env_obj = self._emu.java_vm.jni_env
         assert env_obj.address_ptr == env_ptr, (
             "ERROR input env_ptr != main_thread ptr, impossible for single thread program!!!"
@@ -66,11 +63,9 @@ class AssetManagerHooks:
     @native_method
     def __AAssetManager_open(self, uc, amgr_ptr, filename_ptr, mode):
         filename = memory_helpers.read_utf8(uc, filename_ptr)
-        logger.debug(
-            "AAssetManager_open call [0x%08X], [%s]" % (amgr_ptr, filename)
-        )
+        logger.debug(f"AAssetManager_open call [0x{amgr_ptr:08X}], [{filename}]")
         zipf = self.__local_ptr_map[amgr_ptr]
-        real_filename = "assets/%s" % filename
+        real_filename = f"assets/{filename}"
         zf = zipf.open(real_filename, mode="r")
         self.__local_asset_ptr_map[self.__local_asset_ptr_off] = (
             zf,
@@ -84,7 +79,7 @@ class AssetManagerHooks:
 
     @native_method
     def __AAsset_close(self, uc, asset_ptr):
-        logger.debug("AAssetManager_close call [0x%08X]" % (asset_ptr,))
+        logger.debug(f"AAssetManager_close call [0x{asset_ptr:08X}]")
         asset_sa = self.__local_asset_ptr_map.pop(asset_ptr)
         asset_obj = asset_sa[0]
         asset_obj.close()
@@ -97,20 +92,18 @@ class AssetManagerHooks:
         if b is None:
             # logger.error("AAsset_read return None...")
             raise RuntimeError("AAsset_read return None...")
-            return -1
 
         n = len(b)
         uc.mem_write(buf_ptr, b)
 
         logger.debug(
-            "AAsset_read call [0x%08X] [0x%08X] [%d] return [%d]"
-            % (asset_ptr, buf_ptr, count, n)
+            f"AAsset_read call [0x{asset_ptr:08X}] [0x{buf_ptr:08X}] [{count}] return [{n}]"
         )
         return n
 
     @native_method
     def __AAsset_getLength(self, uc, asset_ptr):
-        logger.debug("AAssetManager_getLength call [0x%08X]" % (asset_ptr))
+        logger.debug(f"AAssetManager_getLength call [0x{asset_ptr:08X}]")
         asset_sa = self.__local_asset_ptr_map[asset_ptr]
         asset_filename = asset_sa[1]
         zipf = asset_sa[2]

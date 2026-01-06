@@ -14,4 +14,46 @@ class Environment(metaclass=JavaClassDef, jvm_name="android/os/Environment"):
         native=False,
     )
     def getExternalStorageDirectory(emu):
-        return File("/sdcard/")
+        path = emu.config.get("external_storage", "/sdcard/")
+        return File(path)
+
+    @staticmethod
+    @java_method_def(
+        name="getDataDirectory",
+        signature="()Ljava/io/File;",
+        native=False,
+    )
+    def getDataDirectory(emu):
+        return File("/data")
+
+    @staticmethod
+    @java_method_def(
+        name="getRootDirectory",
+        signature="()Ljava/io/File;",
+        native=False,
+    )
+    def getRootDirectory(emu):
+        return File("/system")
+
+    @staticmethod
+    @java_method_def(
+        name="getExternalStorageState",
+        signature="()Ljava/lang/String;",
+        native=False,
+    )
+    def getExternalStorageState(emu):
+        from .string import String
+
+        return String("mounted")  # MEDIA_MOUNTED
+
+    @staticmethod
+    @java_method_def(
+        name="getExternalStorageState",
+        args_list=["Ljava/io/File;"],
+        signature="(Ljava/io/File;)Ljava/lang/String;",
+        native=False,
+    )
+    def getExternalStorageStateFile(emu, file):
+        from .string import String
+
+        return String("mounted")

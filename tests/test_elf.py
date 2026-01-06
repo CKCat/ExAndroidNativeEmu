@@ -30,7 +30,7 @@ class TestElf(unittest.TestCase):
         self.assertTrue("libc.so" in so_needed)
 
     def test_readelf64(self):
-        r = ELFReader("vfs/system/lib64/libc.so")
+        r = ELFReader("androidemu/data/vfs/system/lib64/libc.so")
         rels = r.get_rels()
         dynrel = rels["dynrel"]
 
@@ -57,7 +57,7 @@ class TestElf(unittest.TestCase):
 
     def test_load_bias(self):
         # 测试有load_bias情况下是否正确
-        r = ELFReader("vfs/system/lib64/libc++.so")
+        r = ELFReader("androidemu/data/vfs/system/lib64/libc++.so")
 
         rels = r.get_rels()
 
@@ -74,7 +74,7 @@ class TestElf(unittest.TestCase):
 
     def test_libart(self):
         # 测试有load_bias情况下是否正确
-        r = ELFReader("vfs/system/lib64/libart.so")
+        r = ELFReader("androidemu/data/vfs/system/lib64/libart.so")
         rels = r.get_rels()
         relplt = rels["relplt"]
         syms = r.get_symbols()

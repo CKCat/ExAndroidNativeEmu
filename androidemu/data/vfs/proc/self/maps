@@ -1,0 +1,45 @@
+01000000-01200000 rwx 00000000 00:00 0 		 
+02000000-02001000 rw- 00000000 00:00 0 		 
+03000000-03001000 r-x 00000000 00:00 0 		 
+05000000-05005000 rw- 00000000 00:00 0 		 
+10000000-10100000 rw- 00000000 00:00 0 		 
+30000000-30040000 rw- 00000000 00:00 0 		 
+30040000-30060000 r-- 00000000 00:00 0 		 /dev/__properties__
+30060000-30061000 r-- 00000000 00:00 0 		 
+30061000-30066000 rw- 00000000 00:00 0 		 
+30066000-30071000 r-x 00000000 00:00 0 		 
+ab006000-ab00c000 r-x 00000000 00:00 0 		 /system/bin/app_process32
+cbbcb000-cbc1c000 r-x 00000000 00:00 0 		 /system\lib\libdvm.so
+cbc1c000-cbc1d000 rwx 00000000 00:00 0 		 /system\lib\libdvm.so
+cbc1d000-cbc72000 r-x 00000000 00:00 0 		 /system\lib\libdvm.so
+cbc72000-cbc7b000 rw- 000a6000 00:00 0 		 /system\lib\libdvm.so
+cbc7b000-cbc7d000 rw- 00000000 00:00 0 		 
+cbc7d000-cbc86000 r-x 00000000 00:00 0 		 /system\lib\libcutils.so
+cbc86000-cbc88000 rw- 00008000 00:00 0 		 /system\lib\libcutils.so
+cbc88000-cbc8b000 r-x 00000000 00:00 0 		 /system\lib\liblog.so
+cbc8b000-cbc8d000 rw- 00002000 00:00 0 		 /system\lib\liblog.so
+cbc8d000-cbcad000 r-x 00000000 00:00 0 		 /system\lib\libc.so
+cbcad000-cbcae000 rwx 00000000 00:00 0 		 /system\lib\libc.so
+cbcae000-cbcd4000 r-x 00000000 00:00 0 		 /system\lib\libc.so
+cbcd5000-cbcda000 rw- 00047000 00:00 0 		 /system\lib\libc.so
+cbcda000-cbce8000 rw- 00000000 00:00 0 		 
+cbce8000-cbcea000 r-x 00000000 00:00 0 		 /system\lib\libdl.so
+cbcea000-cbcec000 rw- 00001000 00:00 0 		 /system\lib\libdl.so
+cbcec000-cbced000 r-x 00000000 00:00 0 		 /system\lib\libstdc++.so
+cbced000-cbcef000 rw- 00000000 00:00 0 		 /system\lib\libstdc++.so
+cbcef000-cbd07000 r-x 00000000 00:00 0 		 /system\lib\libm.so
+cbd07000-cbd09000 rw- 00017000 00:00 0 		 /system\lib\libm.so
+cbd09000-cbd0d000 r-x 00000000 00:00 0 		 /system\lib\libnativehelper.so
+cbd0d000-cbd0f000 rw- 00003000 00:00 0 		 /system\lib\libnativehelper.so
+cbd0f000-cbd41000 r-x 00000000 00:00 0 		 /system\lib\libstlport.so
+cbd41000-cbd44000 rw- 00031000 00:00 0 		 /system\lib\libstlport.so
+cbd44000-cbd4e000 r-x 00000000 00:00 0 		 /system\lib\libselinux.so
+cbd4f000-cbd51000 rw- 0000a000 00:00 0 		 /system\lib\libselinux.so
+cbd51000-cbd67000 r-x 00000000 00:00 0 		 /system\lib\libz.so
+cbd68000-cbd6a000 rw- 00016000 00:00 0 		 /system\lib\libz.so
+cbd6a000-cbdbd000 r-x 00000000 00:00 0 		 /..\..\..\tests\bin\libSecShell.so
+cbdbe000-cbdc4000 rw- 00053000 00:00 0 		 /..\..\..\tests\bin\libSecShell.so
+cbdc4000-cbdd8000 rw- 00000000 00:00 0 		 
+d2000000-d2002000 rwx 00000000 00:00 0 		 
+fe000000-fe001000 r-x 00000000 00:00 0 		 
+ffff0000-ffff1000 r-x 00000000 00:00 0 		 [vectors]

@@ -1,179 +1,413 @@
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING
+import struct
+from typing import TYPE_CHECKING, Any, List
 
 from loguru import logger
 from unicorn.arm64_const import (
+    UC_ARM64_REG_D0,
+    UC_ARM64_REG_D1,
+    UC_ARM64_REG_D2,
+    UC_ARM64_REG_D3,
+    UC_ARM64_REG_D4,
+    UC_ARM64_REG_D5,
+    UC_ARM64_REG_D6,
+    UC_ARM64_REG_D7,
+    UC_ARM64_REG_S0,
+    UC_ARM64_REG_S1,
+    UC_ARM64_REG_S2,
+    UC_ARM64_REG_S3,
+    UC_ARM64_REG_S4,
+    UC_ARM64_REG_S5,
+    UC_ARM64_REG_S6,
+    UC_ARM64_REG_S7,
     UC_ARM64_REG_SP,
     UC_ARM64_REG_X0,
     UC_ARM64_REG_X1,
+    UC_ARM64_REG_X2,
+    UC_ARM64_REG_X3,
+    UC_ARM64_REG_X4,
+    UC_ARM64_REG_X5,
+    UC_ARM64_REG_X6,
+    UC_ARM64_REG_X7,
 )
-from unicorn.arm_const import UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_SP
+from unicorn.arm_const import (
+    UC_ARM_REG_R0,
+    UC_ARM_REG_R1,
+    UC_ARM_REG_R2,
+    UC_ARM_REG_R3,
+    UC_ARM_REG_SP,
+)
 
-from ...const import emu_const, map_reg
+from ...const import emu_const
 from ..java_class_def import JavaClassDef
 from ..jni_ref import jbyteArray, jclass, jobject, jobjectArray, jstring
 
 if TYPE_CHECKING:
     from ...emulator import Emulator
 
+# ==================== 类型定义 ====================
+
+
+class Float:
+    """强制表示 32 位浮点数 (float)"""
+
+    def __init__(self, value: float):
+        self.value = value
+
+    def __repr__(self):
+        return f"Float({self.value})"
+
+
+class Double:
+    """强制表示 64 位浮点数 (double)"""
+
+    def __init__(self, value: float):
+        self.value = value
+
+    def __repr__(self):
+        return f"Double({self.value})"
+
+
+# ==================== 常量定义 ====================
+
+ARM64_GPR_REGS = [
+    UC_ARM64_REG_X0,
+    UC_ARM64_REG_X1,
+    UC_ARM64_REG_X2,
+    UC_ARM64_REG_X3,
+    UC_ARM64_REG_X4,
+    UC_ARM64_REG_X5,
+    UC_ARM64_REG_X6,
+    UC_ARM64_REG_X7,
+]
+ARM64_FPR_S_REGS = [
+    UC_ARM64_REG_S0,
+    UC_ARM64_REG_S1,
+    UC_ARM64_REG_S2,
+    UC_ARM64_REG_S3,
+    UC_ARM64_REG_S4,
+    UC_ARM64_REG_S5,
+    UC_ARM64_REG_S6,
+    UC_ARM64_REG_S7,
+]
+ARM64_FPR_D_REGS = [
+    UC_ARM64_REG_D0,
+    UC_ARM64_REG_D1,
+    UC_ARM64_REG_D2,
+    UC_ARM64_REG_D3,
+    UC_ARM64_REG_D4,
+    UC_ARM64_REG_D5,
+    UC_ARM64_REG_D6,
+    UC_ARM64_REG_D7,
+]
+ARM32_ARG_REGS = [UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3]
+
+# ==================== 辅助函数 ====================
+
+
+def float_to_int(val: float) -> int:
+    return struct.unpack("<I", struct.pack("<f", val))[0]
+
+
+def double_to_int(val: float) -> int:
+    return struct.unpack("<Q", struct.pack("<d", val))[0]
+
+
+def int_to_float(val: int) -> float:
+    return struct.unpack("<f", val.to_bytes(4, "little"))[0]
+
+
+def int_to_double(val: int) -> float:
+    return struct.unpack("<d", val.to_bytes(8, "little"))[0]
+
+
+def native_translate_arg(emu: "Emulator", val: Any) -> int:
+    """Python 对象转 Native 指针/整数"""
+    if isinstance(val, int):
+        return val
+
+    jni_env = emu.java_vm.jni_env
+    if isinstance(val, str):
+        return jni_env.add_local_reference(jstring(val))
+    if isinstance(val, (list, tuple)):
+        return jni_env.add_local_reference(jobjectArray(val))
+    if isinstance(val, (bytes, bytearray)):
+        return jni_env.add_local_reference(jbyteArray(val))
+    if isinstance(val, JavaClassDef):
+        return jni_env.add_local_reference(jclass(val))
+    try:
+        return jni_env.add_local_reference(jobject(val))
+    except Exception:
+        return 0  # 无法转换时返回NULL
+
+
+# ==================== 写入参数 (Call Native) ====================
+
 
 def native_write_args(emu: "Emulator", *args):
-    """设置函数的参数
-
-    Args:
-        emu (Emulator): 模拟器。
-    """
-    max_regs_args = 4
-    reg_base = UC_ARM_REG_R0
-    sp_reg = UC_ARM_REG_SP
-
-    if emu.get_arch() == emu_const.ARCH_ARM64:
-        max_regs_args = 8
-        reg_base = UC_ARM64_REG_X0
-        sp_reg = UC_ARM64_REG_SP
-
-    ptr_sz = emu.get_ptr_size()
-
-    # 如果参数的个数小于等于4，直接写入寄存器
-    amount = len(args)
-    nreg = max_regs_args
-    if amount < max_regs_args:
-        nreg = amount
-
-    for i in range(0, nreg):
-        native_write_arg_register(emu, reg_base + i, args[i])
-
-    # 使用栈传递参数
-    if amount > max_regs_args:
-        sp_start = emu.mu.reg_read(sp_reg)
-        sp_current = sp_start
-        sp_current = sp_current - (
-            ptr_sz * (amount - max_regs_args)
-        )  # Reserve space for arguments.
-        sp_end = sp_current
-
-        for arg in args[max_regs_args:]:
-            emu.mu.mem_write(
-                sp_current,
-                native_translate_arg(emu, arg).to_bytes(
-                    ptr_sz, byteorder="little"
-                ),
-            )
-            sp_current = sp_current + ptr_sz
-
-        emu.mu.reg_write(sp_reg, sp_end)
-
-
-def native_read_args_in_hook_code(emu: "Emulator", args_count: int):
-    max_regs_args = 4  # 寄存器参数个数
-    reg_base = UC_ARM_REG_R0
-    sp_reg = UC_ARM_REG_SP
-    logger.debug(f"args_count = {args_count}")
-    if emu.get_arch() == emu_const.ARCH_ARM64:
-        max_regs_args = 8
-        reg_base = UC_ARM64_REG_X0
-        sp_reg = UC_ARM64_REG_SP
-
-    ptr_sz = emu.get_ptr_size()
-
-    nreg = max_regs_args
-    if args_count < max_regs_args:
-        nreg = args_count
-
-    native_args = []
+    """写入参数到寄存器和栈，支持浮点和栈对齐"""
+    is_arm64 = emu.get_arch() == emu_const.ARCH_ARM64
     mu = emu.mu
+    stack_args = []
 
-    for i in range(0, nreg):
-        reg_value = mu.reg_read(reg_base + i)
-        reg_str = map_reg.arm64_const_to_str_map.get(reg_base + i)
-        logger.debug(f"NativeMethod read {reg_str}: 0x{reg_value:08X}")
-        native_args.append(reg_value)
+    if is_arm64:
+        gpr_idx = 0
+        fpr_idx = 0
+        for arg in args:
+            is_fp = isinstance(arg, (float, Float, Double))
+            if is_fp:
+                if fpr_idx < 8:
+                    if isinstance(arg, Float):
+                        mu.reg_write(ARM64_FPR_S_REGS[fpr_idx], float_to_int(arg.value))
+                    else:
+                        val = arg.value if isinstance(arg, Double) else arg
+                        mu.reg_write(ARM64_FPR_D_REGS[fpr_idx], double_to_int(val))
+                    fpr_idx += 1
+                else:
+                    stack_args.append(arg)
+            else:
+                if gpr_idx < 8:
+                    mu.reg_write(
+                        ARM64_GPR_REGS[gpr_idx], native_translate_arg(emu, arg)
+                    )
+                    gpr_idx += 1
+                else:
+                    stack_args.append(arg)
 
-    if args_count > max_regs_args:
-        sp = mu.reg_read(sp_reg)
+        if stack_args:
+            _write_stack_arm64(emu, stack_args)
+    else:
+        # ARM32 简化版 SoftFP
+        reg_idx = 0
+        for arg in args:
+            if isinstance(arg, (float, Double)):
+                # Double takes 2 regs
+                val = double_to_int(arg.value if isinstance(arg, Double) else arg)
+                if reg_idx % 2 != 0:
+                    reg_idx += 1  # Align
+                if reg_idx + 2 <= 4:
+                    mu.reg_write(ARM32_ARG_REGS[reg_idx], val & 0xFFFFFFFF)
+                    mu.reg_write(ARM32_ARG_REGS[reg_idx + 1], val >> 32)
+                    reg_idx += 2
+                else:
+                    stack_args.append(arg)
+            elif isinstance(arg, Float):
+                if reg_idx < 4:
+                    mu.reg_write(ARM32_ARG_REGS[reg_idx], float_to_int(arg.value))
+                    reg_idx += 1
+                else:
+                    stack_args.append(arg)
+            else:
+                if reg_idx < 4:
+                    mu.reg_write(
+                        ARM32_ARG_REGS[reg_idx], native_translate_arg(emu, arg)
+                    )
+                    reg_idx += 1
+                else:
+                    stack_args.append(arg)
 
-        for x in range(0, args_count - max_regs_args):
-            native_args.append(
-                int.from_bytes(
-                    mu.mem_read(sp + (x * ptr_sz), ptr_sz), byteorder="little"
-                )
-            )
+        if stack_args:
+            _write_stack_arm32(emu, stack_args)
+
+
+def _write_stack_arm64(emu, args):
+    # ARM64 栈必须 16 字节对齐
+    sp = emu.mu.reg_read(UC_ARM64_REG_SP)
+    data = b""
+    for arg in args:
+        if isinstance(arg, Float):
+            # 扩展到 8 字节
+            data += struct.pack("<f", arg.value).ljust(8, b"\x00")
+        elif isinstance(arg, (float, Double)):
+            val = arg.value if isinstance(arg, Double) else arg
+            data += struct.pack("<d", val)
+        else:
+            data += native_translate_arg(emu, arg).to_bytes(8, "little")
+
+    # Padding
+    if len(data) % 16 != 0:
+        data += b"\x00" * (16 - (len(data) % 16))
+
+    new_sp = sp - len(data)
+    emu.mu.reg_write(UC_ARM64_REG_SP, new_sp)
+    emu.mu.mem_write(new_sp, data)
+
+
+def _write_stack_arm32(emu, args):
+    sp = emu.mu.reg_read(UC_ARM_REG_SP)
+    data = b""
+    for arg in args:
+        # 简化处理，不处理复杂的 SoftFP 栈拆分
+        val = native_translate_arg(emu, arg)
+        if isinstance(arg, Float):
+            val = float_to_int(arg.value)
+        data += val.to_bytes(4, "little")
+    new_sp = sp - len(data)
+    emu.mu.reg_write(UC_ARM_REG_SP, new_sp)
+    emu.mu.mem_write(new_sp, data)
+
+
+# ==================== 读取参数 (Hook) ====================
+
+
+def native_read_args_in_hook(
+    emu: "Emulator", params: List[inspect.Parameter]
+) -> List[Any]:
+    is_arm64 = emu.get_arch() == emu_const.ARCH_ARM64
+    mu = emu.mu
+    native_args = []
+
+    if is_arm64:
+        gpr_idx, fpr_idx = 0, 0
+        stack_offset = 0
+        sp = mu.reg_read(UC_ARM64_REG_SP)
+
+        for param in params:
+            hint = param.annotation
+            if hint is float or hint is Double:
+                if fpr_idx < 8:
+                    val = int_to_double(mu.reg_read(ARM64_FPR_D_REGS[fpr_idx]))
+                    native_args.append(val)
+                    fpr_idx += 1
+                else:
+                    # Read double from stack
+                    data = mu.mem_read(sp + stack_offset, 8)
+                    val = struct.unpack("<d", data)[0]
+                    native_args.append(val)
+                    stack_offset += 8
+            elif hint is Float:
+                if fpr_idx < 8:
+                    # S reg mapping is complex in Unicorn, read D lower bits
+                    val_bits = mu.reg_read(ARM64_FPR_D_REGS[fpr_idx]) & 0xFFFFFFFF
+                    native_args.append(int_to_float(val_bits))
+                    fpr_idx += 1
+                else:
+                    # Read float from stack (promoted to 8 bytes or packed? AAPCS64 says natural alignment)
+                    # For variadic or unprototyped, promoted to double.
+                    # But here we have prototype (hint).
+                    # "Each argument... is allocated to the next available stack slot... size of the argument".
+                    # However, "each argument... rules... if the argument is a Floating Point... size...".
+                    # Usually slots are 8 bytes aligned on stack for simple types in many ABIs, but AAPCS64 allows packing?
+                    # "The NSAA is rounded up to the larger of 8 or the Natural Alignment of the argument's type."
+                    # So minimum 8 bytes alignment for stack slot? Yes.
+                    data = mu.mem_read(sp + stack_offset, 4)  # Read 4 bytes
+                    val = struct.unpack("<f", data)[0]
+                    # But stack pointer alignment? "NSAA = (NSAA + 7) & ~7" (Align to 8)
+                    native_args.append(val)
+                    stack_offset += 8  # Consume 8 bytes slot
+            else:
+                if gpr_idx < 8:
+                    native_args.append(mu.reg_read(ARM64_GPR_REGS[gpr_idx]))
+                    gpr_idx += 1
+                else:
+                    val = int.from_bytes(mu.mem_read(sp + stack_offset, 8), "little")
+                    native_args.append(val)
+                    stack_offset += 8
+    else:
+        # ARM32 Simple Int Read
+        reg_idx = 0
+        for param in params:
+            if reg_idx < 4:
+                native_args.append(mu.reg_read(ARM32_ARG_REGS[reg_idx]))
+                reg_idx += 1
+            else:
+                SP = mu.reg_read(UC_ARM_REG_SP)
+                stack_offset = (len(native_args) - 4) * 4
+                val = int.from_bytes(mu.mem_read(SP + stack_offset, 4), "little")
+                native_args.append(val)
+
     return native_args
 
 
-def native_translate_arg(emu: "Emulator", val):
-    if isinstance(val, int):
-        return val
-    elif isinstance(val, str):
-        return emu.java_vm.jni_env.add_local_reference(jstring(val))
-    elif isinstance(val, list):
-        return emu.java_vm.jni_env.add_local_reference(jobjectArray(val))
-    elif isinstance(val, bytearray):
-        return emu.java_vm.jni_env.add_local_reference(jbyteArray(val))
-    elif isinstance(type(val), JavaClassDef):
-        # TODO: Look into this, seems wrong..
-        return emu.java_vm.jni_env.add_local_reference(jobject(val))
-    elif isinstance(val, JavaClassDef):
-        return emu.java_vm.jni_env.add_local_reference(jclass(val))
-    else:
-        raise NotImplementedError(
-            "Unable to write response '%s' type '%s' to emulator."
-            % (str(val), type(val))
-        )
+def native_read_args_in_hook_code(emu: "Emulator", nargs: int) -> List[Any]:
+    is_arm64 = emu.get_arch() == emu_const.ARCH_ARM64
+    mu = emu.mu
+    native_args = []
 
-
-def native_write_arg_register(emu: "Emulator", reg: int, val):
-    reg_value = native_translate_arg(emu, val)
-    reg_str = map_reg.arm64_const_to_str_map.get(reg)
-    logger.debug(f"native_write_arg_register {reg_str}: 0x{reg_value:08X}")
-    emu.mu.reg_write(reg, reg_value)
-
-
-# 定义 native 层回调到 python 的方法
-def native_method(func):
-    def native_method_wrapper(*argv):
-        """
-        :type self
-        :type emu androidemu.emulator.Emulator
-        :type mu Uc
-        """
-
-        emu = argv[1] if len(argv) == 2 else argv[0]
-        mu = emu.mu
-        # 判断参数个数
-        args = inspect.getfullargspec(func).args
-        args_count = len(args) - (2 if "self" in args else 1)
-
-        if args_count < 0:
-            raise RuntimeError(
-                "NativeMethod accept at least (self, mu) or (mu)."
-            )
-
-        native_args = native_read_args_in_hook_code(emu, args_count)
-
-        if len(argv) == 1:  # 从寄存器取参数
-            result = func(mu, *native_args)
-        else:
-            result = func(argv[0], mu, *native_args)
-
-        ret_reg0 = UC_ARM_REG_R0
-        ret_reg1 = UC_ARM_REG_R1
-        if emu.get_arch() == emu_const.ARCH_ARM64:
-            ret_reg0 = UC_ARM64_REG_X0
-            ret_reg1 = UC_ARM64_REG_X1
-
-        if result is not None:
-            if isinstance(result, tuple):
-                # tuple 作为特殊返回8字节数据约定
-                rlow = result[0]
-                rhigh = result[1]
-                native_write_arg_register(emu, ret_reg0, rlow)
-                native_write_arg_register(emu, ret_reg1, rhigh)
+    if is_arm64:
+        gpr_idx = 0
+        stack_offset = 0
+        sp = mu.reg_read(UC_ARM64_REG_SP)
+        for _ in range(nargs):
+            if gpr_idx < 8:
+                native_args.append(mu.reg_read(ARM64_GPR_REGS[gpr_idx]))
+                gpr_idx += 1
             else:
-                # FIXME handle python基本类型str int float,处理返回值逻辑略为混乱，
-                # 返回值的问题统一在这里处理掉
-                native_write_arg_register(emu, ret_reg0, result)
+                val = int.from_bytes(mu.mem_read(sp + stack_offset, 8), "little")
+                native_args.append(val)
+                stack_offset += 8
+    else:
+        # ARM32
+        reg_idx = 0
+        sp_offset = 0
+        for _ in range(nargs):
+            if reg_idx < 4:
+                native_args.append(mu.reg_read(ARM32_ARG_REGS[reg_idx]))
+                reg_idx += 1
+            else:
+                sp = mu.reg_read(UC_ARM_REG_SP)
+                val = int.from_bytes(mu.mem_read(sp + sp_offset, 4), "little")
+                native_args.append(val)
+                sp_offset += 4
 
-    return native_method_wrapper
+    return native_args
+
+
+# ==================== 装饰器 ====================
+
+
+def native_method(func):
+    def wrapper(*argv):
+        emu = next((arg for arg in argv if hasattr(arg, "mu")), None)
+        if not emu:
+            raise RuntimeError("Emulator not found in args")
+        mu = emu.mu
+
+        sig = inspect.signature(func)
+        params = [
+            p
+            for p in sig.parameters.values()
+            if p.name not in ("self", "cls", "mu", "emu", "uc")
+        ]
+
+        args = native_read_args_in_hook(emu, params)
+
+        try:
+            if len(argv) > 0 and argv[0] != emu:
+                res = func(argv[0], mu, *args)
+            else:
+                res = func(mu, *args)
+        except Exception as e:
+            logger.exception(f"Hook Error: {func.__name__}")
+            raise e
+
+        # Write Return
+        if res is not None:
+            is_arm64 = emu.get_arch() == emu_const.ARCH_ARM64
+            if isinstance(res, (float, Double)):
+                if is_arm64:
+                    mu.reg_write(
+                        UC_ARM64_REG_D0,
+                        double_to_int(res if isinstance(res, float) else res.value),
+                    )
+            elif isinstance(res, Float):
+                if is_arm64:
+                    mu.reg_write(UC_ARM64_REG_S0, float_to_int(res.value))
+            elif isinstance(res, tuple):
+                # (r0, r1)
+                if is_arm64:
+                    mu.reg_write(UC_ARM64_REG_X0, res[0])
+                    mu.reg_write(UC_ARM64_REG_X1, res[1])
+                else:
+                    mu.reg_write(UC_ARM_REG_R0, res[0])
+                    mu.reg_write(UC_ARM_REG_R1, res[1])
+            else:
+                # Int
+                if is_arm64:
+                    mu.reg_write(UC_ARM64_REG_X0, res)
+                else:
+                    mu.reg_write(UC_ARM_REG_R0, res)
+
+    return wrapper

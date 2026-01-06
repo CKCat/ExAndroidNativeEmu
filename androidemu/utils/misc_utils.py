@@ -3,23 +3,25 @@ import os.path
 import platform
 
 from loguru import logger
-from unicorn.arm64_const import UC_ARM64_REG_TPIDR_EL0
-from unicorn.arm_const import UC_ARM_REG_C13_C0_3
 
-from ..const import emu_const
-
-g_isWin = platform.system() == "Windows"
+IS_WINDOWS = platform.system() == "Windows"
 
 
-def vfs_path_to_system_path(vfs_root:str, path:str):
+def vfs_path_to_system_path(vfs_root: str, path: str) -> str:
     if os.name == "nt":
         path = path.replace(":", "_")
-    fullpath = f"{vfs_root}{path}"
+
+    # Ensure path doesn't start with / if we want to join it successfully with join
+    # but vfs path usually starts with /.
+    if path.startswith("/") or path.startswith("\\"):
+        path = path[1:]
+
+    fullpath = os.path.join(vfs_root, path)
     logger.debug(f"vfs_path_to_system_path: {fullpath}")
     return fullpath
 
 
-def system_path_to_vfs_path(vfs_root, path):
+def system_path_to_vfs_path(vfs_root: str, path: str) -> str:
     return "/" + os.path.relpath(path, vfs_root)
 
 
@@ -30,15 +32,15 @@ PF_R = 0x4  # Readable
 PAGE_SIZE = 0x1000
 
 
-def page_start(addr):
+def page_start(addr: int) -> int:
     return addr & (~(PAGE_SIZE - 1))
 
 
-def page_end(addr):
+def page_end(addr: int) -> int:
     return page_start(addr + (PAGE_SIZE - 1))
 
 
-def get_segment_protection(prot_in):
+def get_segment_protection(prot_in: int) -> int:
     prot = 0
 
     if prot_in & PF_R != 0:
@@ -53,20 +55,7 @@ def get_segment_protection(prot_in):
     return prot
 
 
-def my_open(fd, flag):
-    global g_isWin
-    if g_isWin:
+def my_open(path: str, flag: int) -> int:
+    if IS_WINDOWS:
         flag = flag | os.O_BINARY
-    return os.open(fd, flag)
-
-
-def set_errno(emu, errno):
-    mu = emu.mu
-    if emu.get_arch() == emu_const.ARCH_ARM32:
-        err_ptr = mu.reg_reg(UC_ARM_REG_C13_C0_3) + 8
-        mu.mem_write(err_ptr, int(errno).to_bytes(4, byteorder="little"))
-    #
-    else:
-        err_ptr = mu.reg_write(UC_ARM64_REG_TPIDR_EL0) + 16
-        # errno 是int，只写四个字节
-        mu.mem_write(err_ptr, int(errno).to_bytes(4, byteorder="little"))
+    return os.open(path, flag)

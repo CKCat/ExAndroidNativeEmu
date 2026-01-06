@@ -3,7 +3,7 @@ import unittest
 
 from androidemu.const import emu_const
 from androidemu.emulator import Emulator
-from androidemu.native_hook_utils import FuncHooker
+from androidemu.utils.native_hook_utils import FuncHooker
 
 
 class TestThread(unittest.TestCase):
@@ -32,8 +32,8 @@ class TestThread(unittest.TestCase):
         return False
 
     def test_thread32(self):
-        emulator = Emulator(vfs_root="vfs", muti_task=True)
-        libcm = emulator.load_library("vfs/system/lib/libc.so")
+        emulator = Emulator(vfs_root="androidemu/data/vfs", muti_task=True)
+        libcm = emulator.load_library("androidemu/data/vfs/system/lib/libc.so")
         sym = libcm.find_symbol("pthread_create")
         h = FuncHooker(emulator)
         h.fun_hook(
@@ -67,9 +67,9 @@ class TestThread(unittest.TestCase):
 
     def test_thread64(self):
         emulator = Emulator(
-            vfs_root="vfs", arch=emu_const.ARCH_ARM64, muti_task=True
+            vfs_root="androidemu/data/vfs", arch=emu_const.ARCH_ARM64, muti_task=True
         )
-        libcm = emulator.load_library("vfs/system/lib64/libc.so")
+        libcm = emulator.load_library("androidemu/data/vfs/system/lib64/libc.so")
         sym = libcm.find_symbol("pthread_create")
 
         h = FuncHooker(emulator)

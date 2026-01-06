@@ -1,11 +1,17 @@
-from ..constant_values import JAVA_NULL
+from ...const.java_const import JAVA_NULL
 from ..java_class_def import JavaClassDef
 from ..java_method_def import java_method_def
 from .java_set import Set
 
 
-class HashMap(metaclass=JavaClassDef, jvm_name="java/util/HashMap"):
+from .object import Object
+
+
+class HashMap(
+    Object, metaclass=JavaClassDef, jvm_name="java/util/HashMap", jvm_super=Object
+):
     def __init__(self, pydict={}):
+        Object.__init__(self)
         self.__pydict = pydict
 
     @java_method_def(name="<init>", signature="()V", native=False)
@@ -56,6 +62,32 @@ class HashMap(metaclass=JavaClassDef, jvm_name="java/util/HashMap"):
 
     @java_method_def(name="keySet", signature="()Ljava/util/Set;", native=False)
     def keySet(self, emu):
-        # FIXME 由于不支持子类函数覆盖父类，所以暂时以Set返回
+        # Note: subclass function override not fully supported, returning temporary Set.
         jset = Set(set(self.__pydict.keys()))
         return jset
+
+    @java_method_def(
+        name="remove",
+        args_list=["jobject"],
+        signature="(Ljava/lang/Object;)Ljava/lang/Object;",
+        native=False,
+    )
+    def remove(self, emu, key):
+        if key in self.__pydict:
+            val = self.__pydict[key]
+            del self.__pydict[key]
+            return val
+        return JAVA_NULL
+
+    @java_method_def(
+        name="containsKey",
+        args_list=["jobject"],
+        signature="(Ljava/lang/Object;)Z",
+        native=False,
+    )
+    def containsKey(self, emu, key):
+        return key in self.__pydict
+
+    @java_method_def(name="isEmpty", signature="()Z", native=False)
+    def isEmpty(self, emu):
+        return len(self.__pydict) == 0

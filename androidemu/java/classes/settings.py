@@ -5,9 +5,7 @@ from ..java_method_def import java_method_def
 from .string import String
 
 
-class Secure(
-    metaclass=JavaClassDef, jvm_name="android/provider/Settings$Secure"
-):
+class Secure(metaclass=JavaClassDef, jvm_name="android/provider/Settings$Secure"):
     def __init__(self):
         pass
 
@@ -25,7 +23,8 @@ class Secure(
             android_id = emu.config.get("android_id")
             return String(android_id)
 
-        raise NotImplementedError()
+        logger.warning(f"Settings.Secure.getString key {pys1} not implemented")
+        return String("")
         return String("")
 
 

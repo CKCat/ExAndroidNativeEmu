@@ -223,7 +223,7 @@ def dump_stack(emu: Emulator, fd, max_deep=512):
     else:
         sp = mu.reg_read(UC_ARM64_REG_SP)
     stop = sp + max_deep
-    fd.wirte("stack dumps:\n")
+    fd.write("stack dumps:\n")
     ptr_sz = emu.get_ptr_size()
     for ptr in range(sp, stop, ptr_sz):
         valb = mu.mem_read(ptr, ptr_sz)

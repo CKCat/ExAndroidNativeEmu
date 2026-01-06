@@ -9,6 +9,7 @@ from loguru import logger
 from ..const import emu_const, linux
 from ..utils import memory_helpers, misc_utils
 from . import file_helpers
+from .proc_helpers import ProcFS
 
 g_isWin = platform.system() == "Windows"
 if not g_isWin:
@@ -16,47 +17,6 @@ if not g_isWin:
 
 OVERRIDE_URANDOM = False
 OVERRIDE_URANDOM_INT = 1
-
-# status
-s_status = """
-Name:   {pkg_name}
-State:  R (running)
-Tgid:   1434
-Pid:    1434
-PPid:   197
-TracerPid:      0
-Uid:    10054   10054   10054   10054
-Gid:    10054   10054   10054   10054
-FDSize: 512
-Groups: 1015 1028 3003 50054 
-VmPeak:  1229168 kB
-VmSize:  1115232 kB
-VmLck:         0 kB
-VmPin:         0 kB
-VmHWM:    179992 kB
-VmRSS:    179836 kB
-VmData:   191904 kB
-VmStk:       136 kB
-VmExe:         8 kB
-VmLib:     48448 kB
-VmPTE:       536 kB
-VmSwap:        0 kB
-Threads:        105
-SigQ:   0/12272
-SigPnd: 0000000000000000
-ShdPnd: 0000000000000000
-SigBlk: 0000000000001204
-SigIgn: 0000000000000000
-SigCgt: 00000002000094f8
-CapInh: 0000000000000000
-CapPrm: 0000000000000000
-CapEff: 0000000000000000
-CapBnd: fffffff000000000
-Cpus_allowed:   f
-Cpus_allowed_list:      0-3
-voluntary_ctxt_switches:        5225
-nonvoluntary_ctxt_switches:     11520
-"""
 
 
 class VirtualFileSystem:
@@ -78,6 +38,7 @@ class VirtualFileSystem:
         self.__cfg = cfg
         self.__memory_map = memory_map
         self.__pcb = emu.get_pcb()
+        self._proc_fs = ProcFS(emu, cfg, memory_map, self.__pcb)
         self.__clear_proc_dir()
         self.__root_list = set(["/dev/__properties__"])
         if self.__emu.get_arch() == emu_const.ARCH_ARM32:
@@ -96,26 +57,16 @@ class VirtualFileSystem:
             syscall_handler.set_handler(0x92, "writev", 3, self._handle_writev)
             syscall_handler.set_handler(0xA8, "poll", 3, self._handle_poll)
             syscall_handler.set_handler(0xC3, "stat64", 2, self._handle_stat64)
-            syscall_handler.set_handler(
-                0xC4, "lstat64", 2, self._handle_lstat64
-            )
-            syscall_handler.set_handler(
-                0xC5, "fstat64", 2, self._handle_fstat64
-            )
-            syscall_handler.set_handler(
-                0xD9, "getdents64", 3, self._handle_getdents64
-            )
+            syscall_handler.set_handler(0xC4, "lstat64", 2, self._handle_lstat64)
+            syscall_handler.set_handler(0xC5, "fstat64", 2, self._handle_fstat64)
+            syscall_handler.set_handler(0xD9, "getdents64", 3, self._handle_getdents64)
             syscall_handler.set_handler(0xDD, "fcntl64", 6, self.__fcntl64)
             syscall_handler.set_handler(0x10A, "statfs64", 3, self.__statfs64)
             syscall_handler.set_handler(0x142, "openat", 4, self._handle_openat)
             syscall_handler.set_handler(0x143, "mkdirat", 3, self.__mkdirat)
-            syscall_handler.set_handler(
-                0x147, "fstatat64", 4, self._handle_fstatat64
-            )
+            syscall_handler.set_handler(0x147, "fstatat64", 4, self._handle_fstatat64)
             syscall_handler.set_handler(0x148, "unlinkat", 3, self.__unlinkat)
-            syscall_handler.set_handler(
-                0x14C, "readlinkat", 4, self.__readlinkat
-            )
+            syscall_handler.set_handler(0x14C, "readlinkat", 4, self.__readlinkat)
             syscall_handler.set_handler(0x14E, "faccessat", 4, self._faccessat)
             syscall_handler.set_handler(0x150, "ppoll", 4, self.__ppoll)
 
@@ -139,9 +90,7 @@ class VirtualFileSystem:
             # no stat64
             # no lstat64
             # no fstat64 use fstat
-            syscall_handler.set_handler(
-                0x3D, "getdents64", 3, self._handle_getdents64
-            )
+            syscall_handler.set_handler(0x3D, "getdents64", 3, self._handle_getdents64)
             # no fcntl64
             # no statfs64
 
@@ -151,15 +100,11 @@ class VirtualFileSystem:
             # no fstatat64
 
             syscall_handler.set_handler(0x23, "unlinkat", 3, self.__unlinkat)
-            syscall_handler.set_handler(
-                0x4E, "readlinkat", 4, self.__readlinkat
-            )
+            syscall_handler.set_handler(0x4E, "readlinkat", 4, self.__readlinkat)
             syscall_handler.set_handler(0x30, "faccessat", 4, self._faccessat)
             syscall_handler.set_handler(0x49, "ppoll", 4, self.__ppoll)
 
-            syscall_handler.set_handler(
-                0x4F, "newfstatat", 4, self._handle_fstatat64
-            )
+            syscall_handler.set_handler(0x4F, "newfstatat", 4, self._handle_fstatat64)
 
     def __create_fd_link(self, fd, target):
         global g_isWin
@@ -218,43 +163,11 @@ class VirtualFileSystem:
 
         elif filename.startswith("/proc/"):
             # simulate proc file system
-            parent = os.path.dirname(file_path)
-            if not os.path.exists(parent):
-                os.makedirs(parent)
-            #
-
-            pobj = self.__pcb
-            pid = pobj.get_pid()
-            filename2 = filename.replace(str(pid), "self")
-            # TODO: move pid to config
-
-            map_path = "/proc/self/maps"
-            if filename2 == map_path:
-                with open(file_path, "w") as f:
-                    self.__memory_map.dump_maps(f)
-
-            cmdline_path = "/proc/self/cmdline"
-            if filename2 == cmdline_path:
-                with open(file_path, "w") as f:
-                    # TODO put to config
-                    content = self.__cfg.get("pkg_name")
-                    f.write(content)
-
-            cgroup_path = "/proc/self/cgroup"
-            if filename2 == cgroup_path:
-                with open(file_path, "w") as f:
-                    # TODO put to config
-                    uid = self.__get_config_uid(filename)
-                    content = "2:cpu:/apps\n1:cpuacct:/uid/%d\n" % uid
-                    f.write(content)
-
-            status_path = "/proc/self/status"
-            if filename2 == status_path:
-                with open(file_path, "w") as f:
-                    # TODO put to config
-                    name = self.__cfg.get("pkg_name")
-                    content = s_status.format(pkg_name=name)
-                    f.write(content)
+            # Delegate to ProcFS helper
+            if self._proc_fs.generate_proc_file(
+                filename, file_path, self.__get_config_uid
+            ):
+                pass
 
         virtual_file = [
             "/dev/log/main",
@@ -285,13 +198,19 @@ class VirtualFileSystem:
             if oflag & 0o2000:
                 flags |= os.O_APPEND
 
-            if oflag & 0o40000:
-                flags |= os.O_DIRECTORY
+            if hasattr(os, "O_DIRECTORY"):
+                if oflag & 0o40000:
+                    flags |= os.O_DIRECTORY
 
             if oflag & 0o010000000:
                 flags |= os.O_PATH
 
-            fd = misc_utils.my_open(file_path, flags)
+            if g_isWin and os.path.isdir(file_path):
+                # Windows cannot open directory with os.open, use NUL for valid FD
+                fd = misc_utils.my_open("NUL", os.O_RDONLY)
+            else:
+                fd = misc_utils.my_open(file_path, flags)
+
             self.__pcb.add_fd(filename, file_path, fd)
             logger.info("open [%s][0x%x] return fd %d" % (file_path, oflag, fd))
             self.__create_fd_link(fd, file_path)
@@ -302,22 +221,23 @@ class VirtualFileSystem:
 
     def __dirfd_2_path(self, dirfd, relpath):
         if dirfd == linux.AT_FDCWD:
-            return relpath
+            return self.__norm_file_name(relpath)
 
         if os.path.isabs(relpath):
             # 绝对路径，直接忽略
-            return relpath
+            return self.__norm_file_name(relpath)
 
-        else:
-            fdesc = self.__pcb.get_fd_detail(dirfd)
-            if fdesc is None:
-                # fd不存在，可能是bug...要看被模拟的程序逻辑
-                logger.info("dirfd %d is invalid!!!" % dirfd)
-                return None
+        fdesc = self.__pcb.get_fd_detail(dirfd)
+        if fdesc is None:
+            # fd不存在，可能是bug...要看被模拟的程序逻辑
+            logger.warning(
+                f"dirfd {dirfd} is invalid or not a directory for relative path '{relpath}'"
+            )
+            return None
 
-            dirpath = fdesc.name
-            path = os.path.join(dirpath, relpath)
-            return path
+        dirpath = fdesc.name
+        path = os.path.join(dirpath, relpath)
+        return path
 
     def __norm_file_name(self, filename_in_vm):
         filename_norm = os.path.normpath(filename_in_vm)
@@ -368,9 +288,18 @@ class VirtualFileSystem:
             # raise NotImplementedError("Unsupported read operation for file descriptor %d." % fd)
 
         file = self.__pcb.get_fd_detail(fd)
+        sock = file.obj if file else None
+
         logger.debug("Reading %d bytes from '%s'" % (count, file.name))
 
-        buf = os.read(fd, count)
+        if sock:
+            try:
+                buf = sock.recv(count)
+            except Exception as e:
+                logger.error(f"socket recv error: {e}")
+                return -1
+        else:
+            buf = os.read(fd, count)
 
         logger.debug("read return %s" % buf.hex())
         result = len(buf)
@@ -388,11 +317,21 @@ class VirtualFileSystem:
             logger.warning("stderr:[%s]" % s)
             return len(data)
 
+        file = self.__pcb.get_fd_detail(fd)
+        sock = file.obj if file else None
+
         try:
-            r = os.write(fd, data)
+            if sock:
+                r = sock.send(data)
+            else:
+                r = os.write(fd, data)
         except OSError as e:
-            file = self.__pcb.get_fd_detail(fd)
             logger.warning("File write '%s' error %r skip" % (file.name, e))
+            return -1
+        except Exception as e:
+            logger.warning(
+                "File/Socket write '%s' error %r skip" % (file.name if file else fd, e)
+            )
             return -1
 
         return r
@@ -419,8 +358,15 @@ class VirtualFileSystem:
         """
         try:
             if self.__pcb.has_fd(fd):
+                file = self.__pcb.get_fd_detail(fd)
+                sock = file.obj if file else None
                 self.__pcb.remove_fd(fd)
-                os.close(fd)
+
+                if sock:
+                    sock.close()
+                else:
+                    os.close(fd)
+
                 self.__del_fd_link(fd)
             else:
                 # 之前关闭过的直接返回0,与安卓系统行为一致
@@ -468,14 +414,23 @@ class VirtualFileSystem:
         n = 0
         ptr_sz = self.__emu.get_ptr_size()
         vec_sz = 2 * ptr_sz
+
+        file = self.__pcb.get_fd_detail(fd)
+        sock = file.obj if file else None
+
         for i in range(0, vlen):
             addr = memory_helpers.read_ptr_sz(mu, vec + (i * vec_sz), ptr_sz)
-            size = memory_helpers.read_ptr_sz(
-                mu, vec + (i * vec_sz) + ptr_sz, ptr_sz
-            )
+            size = memory_helpers.read_ptr_sz(mu, vec + (i * vec_sz) + ptr_sz, ptr_sz)
             data = bytes(mu.mem_read(addr, size))
             logger.debug("Writev %r" % data)
-            n += os.write(fd, data)
+
+            if sock:
+                try:
+                    n += sock.send(data)
+                except Exception as e:
+                    logger.error(f"writev socket send error: {e}")
+            else:
+                n += os.write(fd, data)
 
         return n
 
@@ -525,9 +480,8 @@ class VirtualFileSystem:
                 events = mu.mem_read(ptr + 4, 2)
                 mu.mem_write(ptr + 6, bytes(events))
 
-            logger.warning(
-                "poll not support in this system skip, just return nfds %d"
-                % nfds
+            logger.info(
+                "poll not support in this system skip, just return nfds %d" % nfds
             )
             return nfds
 
@@ -539,9 +493,7 @@ class VirtualFileSystem:
         if timeout_ts_ptr != 0:
             ptr_sz = self.__emu.get_ptr_size()
             tv_sec = memory_helpers.read_ptr_sz(mu, timeout_ts_ptr, ptr_sz)
-            tv_nsec = memory_helpers.read_ptr_sz(
-                mu, timeout_ts_ptr + ptr_sz, ptr_sz
-            )
+            tv_nsec = memory_helpers.read_ptr_sz(mu, timeout_ts_ptr + ptr_sz, ptr_sz)
             timeout = int(tv_sec * 1000 + tv_nsec / 1000000)
 
         return self.__do_poll(mu, pollfd_ptr, nfds, timeout)
@@ -600,7 +552,7 @@ class VirtualFileSystem:
     def __ioctl(self, mu, fd, cmd, arg1, arg2, arg3, arg4):
         # http://man7.org/linux/man-pages/man2/ioctl_list.2.html
         # 0x00008912   SIOCGIFCONF      struct ifconf *
-        # TODO:ifconf struct is complex, implement it
+        # Current implementation skips SIOCGIFCONF as struct construction is complex.
         SIOCGIFCONF = 0x00008912
         logger.info("%x %x %x" % (fd, cmd, arg1))
         if cmd == SIOCGIFCONF:
@@ -620,13 +572,9 @@ class VirtualFileSystem:
         r = fcntl.fcntl(fd, cmd, arg1)
         return r
 
-    def _handle_llseek(
-        self, mu, fd, offset_high, offset_low, result_ptr, whence
-    ):
+    def _handle_llseek(self, mu, fd, offset_high, offset_low, result_ptr, whence):
         if offset_high != 0:
-            raise RuntimeError(
-                "_llseek offset_high %d>0 not implemented" % offset_high
-            )
+            raise RuntimeError("_llseek offset_high %d>0 not implemented" % offset_high)
 
         n = os.lseek(fd, offset_low, whence)
         r = -1
@@ -660,8 +608,8 @@ class VirtualFileSystem:
         f_namelen = {uint32_t} 255
         f_frsize = {uint32_t} 4096
         f_flags = {uint32_t} 1062
-        f_spare = {uint32_t [4]} 
         """
+
         f_fsid = 0
         if hasattr(statv, "f_fsid"):
             logger.debug(statv)
@@ -792,7 +740,9 @@ class VirtualFileSystem:
         #
         vfs_path = self.__translate_path(path)
         logger.debug(f"unlinkat call vfs_path [{vfs_path}]")
-        # TODO delete real file
+        # Real file deletion is disabled for safety in this emulation environment.
+        logger.warning(f"unlinkat not implemented for {vfs_path} (safety precaution)")
+        return -1
 
     def __readlinkat(self, mu, dfd, path, buf, bufsz):
         path_utf8 = memory_helpers.read_utf8(mu, path)

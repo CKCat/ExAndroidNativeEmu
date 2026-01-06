@@ -1,0 +1,3 @@
+# Android 4.4 soinfo offsets
+SOINFO_BASE_OFFSET_ARM32 = 140
+SOINFO_BASE_OFFSET_ARM64 = 152

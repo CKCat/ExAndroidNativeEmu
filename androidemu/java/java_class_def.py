@@ -2,7 +2,8 @@ import inspect
 
 from loguru import logger
 
-from .jvm_id_conter import next_cls_id
+from .jvm_id_counter import next_cls_id
+from .java_field_def import JavaFieldDef
 
 # Class 函数实现基本原则：
 
@@ -33,7 +34,10 @@ class JavaClassDef(type):
         self.jvm_fields: dict = dict()
         self.jvm_ignore: bool = jvm_ignore
         self.jvm_super: str = jvm_super
-        self.class_object = None
+
+        # Speed up lookup
+        self.jvm_methods_idx: dict = dict()
+        self.jvm_fields_idx: dict = dict()
         logger.debug(
             f"Register class {self.__name__} with jvm_name {self.jvm_name} and jvm_id {self.jvm_id}"
         )
@@ -43,11 +47,23 @@ class JavaClassDef(type):
             if hasattr(func[1], "jvm_method"):
                 method = func[1].jvm_method
                 self.jvm_methods[method.jvm_id] = method
+                self.jvm_methods_idx[(method.name, method.signature)] = method
+
+        # 扫描 define 的 JavaFieldDef
+        for name, value in inspect.getmembers(self):
+            if isinstance(value, JavaFieldDef):
+                self.jvm_fields[value.jvm_id] = value
+                self.jvm_fields_idx[(value.name, value.signature, value.is_static)] = (
+                    value
+                )
 
         # 注册所有已定义的 Java 字段。
         if jvm_fields is not None:
             for jvm_field in jvm_fields:
                 self.jvm_fields[jvm_field.jvm_id] = jvm_field
+                self.jvm_fields_idx[
+                    (jvm_field.name, jvm_field.signature, jvm_field.is_static)
+                ] = jvm_field
         logger.debug(f"Registered {len(self.jvm_methods)} methods.")
         logger.debug(f"Registered {len(self.jvm_fields)} fields.")
         super().__init__(name, base, ns)
@@ -56,31 +72,36 @@ class JavaClassDef(type):
         return super().__new__(self, name, base, ns)
 
     def register_native(self, name: str, signature: str, ptr_func: int):
-        found = False
-        found_method = None
-
-        # 查找已定义的 jvm 方法。
-        for method in self.jvm_methods.values():
-            if method.name == name and method.signature == signature:
-                method.native_addr = ptr_func
-                found = True
-                found_method = method
-                break
-
-        if not found:
-            logger.warning(
-                f"Register native ({name}, {signature}, 0x{ptr_func:08X}) failed on class { self.__name__}."
+        key = (name, signature)
+        if key in self.jvm_methods_idx:
+            method = self.jvm_methods_idx[key]
+            method.native_addr = ptr_func
+            logger.debug(
+                f"Registered native function ({name}, {signature}, 0x{ptr_func:08X}) to {self.__name__}.{method.func_name}"
             )
             return
-            # raise RuntimeError("Register native ('%s', '%s') failed on class %s." % (name, signature, cls.__name__))
-        logger.debug(
-            f"Registered native function ({name}, {signature}, 0x{ptr_func:08X}) to {self.__name__}.{found_method.func_name}"
+
+        # Dynamically add the native method if it doesn't exist
+        from .java_method_def import JavaMethodDef
+
+        # Generate a dummy function name
+        func_name = f"{name}_{ptr_func:x}"
+        new_method = JavaMethodDef(
+            func_name, name, signature, True, args_list=None, modifier=0
+        )
+        new_method.native_addr = ptr_func
+
+        self.jvm_methods[new_method.jvm_id] = new_method
+        self.jvm_methods_idx[key] = new_method
+
+        logger.info(
+            f"Dynamically registered native function ({name}, {signature}, 0x{ptr_func:08X}) to {self.__name__}."
         )
 
     def find_method(self, name: str, signature: str):
-        for method in self.jvm_methods.values():
-            if method.name == name and method.signature == signature:
-                return method
+        key = (name, signature)
+        if key in self.jvm_methods_idx:
+            return self.jvm_methods_idx[key]
         if self.jvm_super is not None:
             return self.jvm_super.find_method(name, signature)
 
@@ -97,9 +118,9 @@ class JavaClassDef(type):
         Returns:
             _type_: _description_
         """
-        assert (
-            signature_no_ret[0] == "(" and signature_no_ret[-1] == ")"
-        ), "signature_no_ret error"
+        assert signature_no_ret[0] == "(" and signature_no_ret[-1] == ")", (
+            "signature_no_ret error"
+        )
         for method in self.jvm_methods.values():
             if method.name == name and method.signature.startswith(signature_no_ret):
                 return method
@@ -117,13 +138,9 @@ class JavaClassDef(type):
         return None
 
     def find_field(cls, name, signature, is_static):
-        for field in cls.jvm_fields.values():
-            if (
-                field.name == name
-                and field.signature == signature
-                and field.is_static == is_static
-            ):
-                return field
+        key = (name, signature, is_static)
+        if key in cls.jvm_fields_idx:
+            return cls.jvm_fields_idx[key]
 
         if cls.jvm_super is not None:
             return cls.jvm_super.find_field(name, signature, is_static)

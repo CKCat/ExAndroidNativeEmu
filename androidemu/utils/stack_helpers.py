@@ -44,21 +44,3 @@ class StackHelper:
             self.__sp = self.__sp & (~15)
 
         self.__emu.mu.reg_write(self.__sp_reg, self.__sp)
-
-    def stack_push(self, value: int) -> int:
-        self.__sp -= self.pointersize
-        self.__emu.mu.mem_write(
-            self.__sp,
-            value,
-        )
-
-        return self.regs.arch_sp
-
-    def stack_pop(self) -> int:
-        data = self.ql.mem.read_ptr(self.regs.arch_sp)
-        self.__sp += self.pointersize
-
-        return data
-
-    def get_sp(self):
-        return self.__sp

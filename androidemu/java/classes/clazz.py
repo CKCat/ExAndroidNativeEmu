@@ -2,10 +2,10 @@ import io
 
 from loguru import logger
 
-from ..constant_values import JAVA_NULL
+from ...const.java_const import JAVA_NULL
 from ..java_class_def import JavaClassDef
 from ..java_method_def import java_method_def
-from .activity_thread import ActivityManagerNative, ActivityThread
+
 from .field import Field
 from .method import Method
 from .string import String
@@ -35,15 +35,34 @@ class Class(metaclass=JavaClassDef, jvm_name="java/lang/Class"):
         native=False,
     )
     def forName(emu, name):
-        clz_name = name.get_py_string()
-        if clz_name == "android.app.ActivityThread":
-            return Class(ActivityThread, emu.java_classloader)
-        elif clz_name == "android.app.ActivityManagerNative":
-            return Class(ActivityManagerNative, emu.java_classloader)
-        else:
-            raise NotImplementedError()
+        clz_name = name.get_py_string().replace(".", "/")
+        clazz_def = emu.java_classloader.find_class_by_name(clz_name)
 
-    # FIXME -
+        if clazz_def is None:
+            raise RuntimeError("Class.forName failed for %s" % clz_name)
+
+        return emu.java_classloader.get_class_object(clazz_def)
+
+    @java_method_def(
+        name="getSuperclass", signature="()Ljava/lang/Class;", native=False
+    )
+    def getSuperclass(self, emu):
+        if not self.__pyclazz.jvm_super:
+            return JAVA_NULL
+        # Assuming jvm_super is also a registered class we can find?
+        # In current design, jvm_super is a python class reference.
+        # We need its Class object.
+        jvm_super = self.__pyclazz.jvm_super
+        # Often jvm_super in JavaClassDef is the python class itself.
+        # Check if the loader has the class object for it
+        if jvm_super:
+            obj = self.class_loader.get_class_object(jvm_super)
+            if obj:
+                return obj
+
+        # If it's a type/class not fully initialized or not found:
+        return JAVA_NULL
+
     @java_method_def(
         name="getMethod",
         args_list=["jstring", "jobject"],
@@ -51,11 +70,22 @@ class Class(metaclass=JavaClassDef, jvm_name="java/lang/Class"):
         native=False,
     )
     def getMethod(self, emu, name, parameterTypes):
-        return self.getDeclaredMethod(emu, name, parameterTypes)
+        # 1. Try current class (and public check in theory, but ignoring permissions for now)
+        try:
+            return self.getDeclaredMethod(emu, name, parameterTypes)
+        except Exception:
+            pass
 
-    @java_method_def(
-        name="getName", signature="()Ljava/lang/String;", native=False
-    )
+        # 2. Try super class if exists
+        super_cls = self.getSuperclass(emu)
+        if super_cls and super_cls != JAVA_NULL:
+            return super_cls.getMethod(emu, name, parameterTypes)
+
+        raise RuntimeError(
+            f"Method {name.get_py_string()} not found in class {self.getName(emu).get_py_string()}"
+        )
+
+    @java_method_def(name="getName", signature="()Ljava/lang/String;", native=False)
     def getName(self, emu):
         name = self.__descriptor_represent
         assert name is not None
@@ -116,8 +146,7 @@ class Class(metaclass=JavaClassDef, jvm_name="java/lang/Class"):
     )
     def getDeclaredMethod(self, emu, name, parameterTypes):
         logger.debug(
-            "getDeclaredMethod name:[%r] parameterTypes:[%r]"
-            % (name, parameterTypes)
+            "getDeclaredMethod name:[%r] parameterTypes:[%r]" % (name, parameterTypes)
         )
         sbuf = io.StringIO()
         sbuf.write("(")
@@ -135,12 +164,11 @@ class Class(metaclass=JavaClassDef, jvm_name="java/lang/Class"):
 
         signature_no_ret = sbuf.getvalue()
         pyname = name.get_py_string()
-        pymethod = self.__pyclazz.find_method_sig_with_no_ret(
-            pyname, signature_no_ret
-        )
+        pymethod = self.__pyclazz.find_method_sig_with_no_ret(pyname, signature_no_ret)
         if pymethod is None:
-            assert False, "getDeclaredMethod not found..."
-            return JAVA_NULL
+            raise RuntimeError(
+                f"Method {pyname} with signature {signature_no_ret} not found in {self.__descriptor_represent}"
+            )
 
         reflected_method = Method(self.__pyclazz, pymethod)
         logger.debug("getDeclaredMethod return %r" % reflected_method)

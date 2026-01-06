@@ -19,3 +19,6 @@ class Constructor(
         self.slot = method.jvm_id
         self.declaringClass = self._clazz
         self.accessFlags = method.modifier
+
+    def get_method_id(self):
+        return self._method.jvm_id

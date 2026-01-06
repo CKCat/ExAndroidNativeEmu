@@ -1,9 +1,13 @@
 from ..java_class_def import JavaClassDef
 from ..java_method_def import java_method_def
+from .object import Object
 
 
-class Boolean(metaclass=JavaClassDef, jvm_name="java/lang/Boolean"):
+class Boolean(
+    Object, metaclass=JavaClassDef, jvm_name="java/lang/Boolean", jvm_super=Object
+):
     def __init__(self, value=False):
+        Object.__init__(self)
         self.__value = value
 
     @java_method_def(name="booleanValue", signature="()Z", native=False)
@@ -13,21 +17,18 @@ class Boolean(metaclass=JavaClassDef, jvm_name="java/lang/Boolean"):
     def __repr__(self):
         return "%r" % self.__value
 
-    # TODO: 在继承多态机制完善后移动到Object类上
-    @java_method_def(
-        name="getClass", signature="()Ljava/lang/Class;", native=False
-    )
-    def getClass(self, emu):
-        return self.class_object
+    def get_py_value(self):
+        return self.__value
 
 
-class Integer(metaclass=JavaClassDef, jvm_name="java/lang/Integer"):
+class Integer(
+    Object, metaclass=JavaClassDef, jvm_name="java/lang/Integer", jvm_super=Object
+):
     def __init__(self, value=0):
+        Object.__init__(self)
         self.__value = value
 
-    @java_method_def(
-        name="<init>", args_list=["jint"], signature="(I)V", native=False
-    )
+    @java_method_def(name="<init>", args_list=["jint"], signature="(I)V", native=False)
     def ctor(self, emu, value):
         self.__value = value
 
@@ -38,21 +39,16 @@ class Integer(metaclass=JavaClassDef, jvm_name="java/lang/Integer"):
     def __repr__(self):
         return "%r" % self.__value
 
-    # TODO: 在继承多态机制完善后移动到Object类上
-    @java_method_def(
-        name="getClass", signature="()Ljava/lang/Class;", native=False
-    )
-    def getClass(self, emu):
-        return self.class_object
+    def get_py_value(self):
+        return self.__value
 
 
-class Long(metaclass=JavaClassDef, jvm_name="java/lang/Long"):
+class Long(Object, metaclass=JavaClassDef, jvm_name="java/lang/Long", jvm_super=Object):
     def __init__(self, value=0):
+        Object.__init__(self)
         self.__value = value
 
-    @java_method_def(
-        name="<init>", args_list=["jlong"], signature="(J)V", native=False
-    )
+    @java_method_def(name="<init>", args_list=["jlong"], signature="(J)V", native=False)
     def ctor(self, emu, lvalue):
         self.__value = lvalue
 
@@ -63,27 +59,43 @@ class Long(metaclass=JavaClassDef, jvm_name="java/lang/Long"):
     def __repr__(self):
         return "%r" % self.__value
 
-    # TODO: 在继承多态机制完善后移动到Object类上
-    @java_method_def(
-        name="getClass", signature="()Ljava/lang/Class;", native=False
-    )
-    def getClass(self, emu):
-        return self.class_object
-
     def get_py_value(self):
         return self.__value
 
 
-class Float(metaclass=JavaClassDef, jvm_name="java/lang/Float"):
+class Float(
+    Object, metaclass=JavaClassDef, jvm_name="java/lang/Float", jvm_super=Object
+):
     def __init__(self, value=0.0):
+        Object.__init__(self)
         self.__value = value
 
     def __repr__(self):
         return "%r" % self.__value
 
-    # #TODO: 在继承多态机制完善后移动到Object类上
+    def get_py_value(self):
+        return self.__value
+
+
+class Double(
+    Object, metaclass=JavaClassDef, jvm_name="java/lang/Double", jvm_super=Object
+):
+    def __init__(self, value=0.0):
+        Object.__init__(self)
+        self.__value = value
+
     @java_method_def(
-        name="getClass", signature="()Ljava/lang/Class;", native=False
+        name="<init>", args_list=["jdouble"], signature="(D)V", native=False
     )
-    def getClass(self, emu):
-        return self.class_object
+    def ctor(self, emu, value):
+        self.__value = value
+
+    @java_method_def(name="doubleValue", signature="()D", native=False)
+    def doubleValue(self, emu):
+        return self.__value
+
+    def __repr__(self):
+        return "%r" % self.__value
+
+    def get_py_value(self):
+        return self.__value

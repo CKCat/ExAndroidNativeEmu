@@ -42,14 +42,10 @@ class Hooker:
             # Create the ARM assembly code.
             # 注意，这里不要改sp，因为后面hook code会靠sp来定位参数
             # Write assembly code to the emulator.
-            self._emu.mu.mem_write(
-                self._hook_current, b"\x1e\xff\x2f\xe1"
-            )  # bx lr
+            self._emu.mu.mem_write(self._hook_current, b"\x1e\xff\x2f\xe1")  # bx lr
             self._hook_current += 4
         else:
-            self._emu.mu.mem_write(
-                self._hook_current, b"\xc0\x03\x5f\xd6"
-            )  # ret
+            self._emu.mu.mem_write(self._hook_current, b"\xc0\x03\x5f\xd6")  # ret
             self._hook_current += 4
 
         return hook_addr
@@ -89,17 +85,15 @@ class Hooker:
 
     def _hook(self, mu, address, size, user_data):
         # 通过hook一条特殊的指令回调到 python 处理
-        # FIXME : 这里有隐晦的bug，如果在触发hook的指令刚好被调度器打断，则这个回调会正常执行，但是执行后会修改状态，比如函数调用改了r0等返回值
-        # 而 unicorn 恢复调用时候会再次触发该回调，相当于这个回调同时触发了两次，但是此时的上下文已经被上次的调用改掉了，导致这次调用的上下文是错的
-        # 如果调度器采用指令数量中断容易有可能出现这个问题(emu_start第四个参数)
-        # 总结目前局限，不要在hook_code内部调用emu_stop
+        # WARNING : 这里有 known limitation
+        # 如果在触发hook的指令刚好被调度器打断(例如instruction count limit)，则这个回调会正常执行，但是执行后会修改状态
+        # 而 unicorn 恢复调用时候会再次触发该回调。
+        # 因此尽量不要在hook_code内部调用emu_stop暂停后再恢复执行。
         self.arch = self._emu.get_arch()
         # 所有 hook_id 就在这条指令的前四个四节
         hook_id_ptr = address - 4
         hook_id_bytes = mu.mem_read(hook_id_ptr, 4)
-        hook_id = int.from_bytes(
-            hook_id_bytes, byteorder="little", signed=False
-        )
+        hook_id = int.from_bytes(hook_id_bytes, byteorder="little", signed=False)
 
         hook_func = self._hooks[hook_id]
 
@@ -111,4 +105,4 @@ class Hooker:
             mu.emu_stop()
             traceback.print_exc()
             logger.exception("catch error on _hook")
-            raise "hook_func error"
+            raise RuntimeError("hook_func error")

@@ -3,6 +3,7 @@ from ..classes.string import String
 from ..java_class_def import JavaClassDef
 from ..java_field_def import JavaFieldDef
 from ..java_method_def import java_method_def
+from .object import Object
 
 
 class WifiInfo(metaclass=JavaClassDef, jvm_name="android/net/wifi/WifiInfo"):
@@ -13,8 +14,7 @@ class WifiInfo(metaclass=JavaClassDef, jvm_name="android/net/wifi/WifiInfo"):
         name="getMacAddress", signature="()Ljava/lang/String;", native=False
     )
     def getMacAddress(self, emu, *args, **kwargs):
-        # TODO read from config
-        mac = emu.config.get("mac")
+        mac = emu.config.get("mac", [0x02, 0x00, 0x00, 0x00, 0x00, 0x00])
         s = "%02x:%02x:%02x:%02x:%02x:%02x" % (
             mac[0],
             mac[1],
@@ -25,24 +25,42 @@ class WifiInfo(metaclass=JavaClassDef, jvm_name="android/net/wifi/WifiInfo"):
         )
         return String(s)
 
-    @java_method_def(
-        name="getBSSID", signature="()Ljava/lang/String;", native=False
-    )
-    def getBSSID(self, *args, **kwargs):
-        # TODO 从WifiConfiguration 获取
-        return String("")
+    @java_method_def(name="getBSSID", signature="()Ljava/lang/String;", native=False)
+    def getBSSID(self, emu, *args, **kwargs):
+        val = emu.config.get("bssid", "00:00:00:00:00:00")
+        return String(val)
 
-    @java_method_def(
-        name="getSSID", signature="()Ljava/lang/String;", native=False
-    )
-    def getSSID(self, *args, **kwargs):
-        # TODO 从WifiConfiguration 获取
-        return String("")
+    @java_method_def(name="getSSID", signature="()Ljava/lang/String;", native=False)
+    def getSSID(self, emu, *args, **kwargs):
+        val = emu.config.get("ssid", "<unknown ssid>")
+        return String(val)
 
 
-class NetworkInfo(metaclass=JavaClassDef, jvm_name="android/net/NetworkInfo"):
-    def __init__(self):
-        pass
+class NetworkInfo(
+    Object, metaclass=JavaClassDef, jvm_name="android/net/NetworkInfo", jvm_super=Object
+):
+    def __init__(self, type_int=1, type_name="WIFI", state="CONNECTED"):
+        Object.__init__(self)
+        self.__type = type_int
+        self.__typeName = type_name
+        self.__state = state
+        self.__isConnected = True
+
+    @java_method_def(name="getType", signature="()I", native=False)
+    def getType(self, emu):
+        return self.__type
+
+    @java_method_def(name="getTypeName", signature="()Ljava/lang/String;", native=False)
+    def getTypeName(self, emu):
+        return String(self.__typeName)
+
+    @java_method_def(name="isConnected", signature="()Z", native=False)
+    def isConnected(self, emu):
+        return self.__isConnected
+
+    @java_method_def(name="isConnectedOrConnecting", signature="()Z", native=False)
+    def isConnectedOrConnecting(self, emu):
+        return self.__isConnected
 
 
 class WifiConfiguration(
@@ -79,9 +97,7 @@ class DhcpInfo(
         self.gateway = 0
 
 
-class WifiManager(
-    metaclass=JavaClassDef, jvm_name="android/net/wifi/WifiManager"
-):
+class WifiManager(metaclass=JavaClassDef, jvm_name="android/net/wifi/WifiManager"):
     def __init__(self):
         self.__list = List([])
         self.__dhcpInfo = DhcpInfo()
@@ -100,19 +116,17 @@ class WifiManager(
     def getDhcpInfo(self, emu):
         return self.__dhcpInfo
 
-    @java_method_def(
-        name="getDeviceId", signature="()Ljava/lang/String;", native=False
-    )
-    def getDeviceId(self, *args, **kwargs):
-        # TODO read from config
-        return String("12345678")
+    @java_method_def(name="getDeviceId", signature="()Ljava/lang/String;", native=False)
+    def getDeviceId(self, emu, *args, **kwargs):
+        val = emu.config.get("device_id", "12345678")
+        return String(val)
 
     @java_method_def(
         name="getSubscriberId", signature="()Ljava/lang/String;", native=False
     )
-    def getSubscriberId(self, *args, **kwargs):
-        # TODO read from config
-        return String("12345678")
+    def getSubscriberId(self, emu, *args, **kwargs):
+        val = emu.config.get("subscriber_id", "12345678")
+        return String(val)
 
     @java_method_def(
         name="getConnectionInfo",
@@ -120,42 +134,7 @@ class WifiManager(
         native=False,
     )
     def getConnectionInfo(self, *args, **kwargs):
-        # TODO read from config
         return WifiInfo()
-
-    @java_method_def(
-        name="getActiveNetworkInfo",
-        signature="()Landroid/net/NetworkInfo;",
-        native=False,
-    )
-    def getActiveNetworkInfo(self, *args, **kwargs):
-        # TODO read from config
-        return NetworkInfo()
-
-
-class TelephonyManager(
-    metaclass=JavaClassDef, jvm_name="android/telephony/TelephonyManager"
-):
-    def __init__(self):
-        pass
-
-    @java_method_def(
-        name="getDeviceId", signature="()Ljava/lang/String;", native=False
-    )
-    def getDeviceId(self, *args, **kwargs):
-        # IMEI
-        # FIXME 读配置文件
-        imei = "353627071193539"
-        return String(imei)
-
-    @java_method_def(
-        name="getSubscriberId", signature="()Ljava/lang/String;", native=False
-    )
-    def getSubscriberId(self, *args, **kwargs):
-        # IMEI
-        # FIXME 读配置文件
-        imsi = "00000000000000"
-        return String(imsi)
 
 
 class RequestBuilder(
@@ -174,28 +153,4 @@ class RequestBuilder(
         native=False,
     )
     def addTransportType(self, emu, i):
-        # IMEI
-        # FIXME 读配置文件
         return RequestBuilder()
-
-
-class NetworkInfo(metaclass=JavaClassDef, jvm_name="android/net/NetworkInfo"):  # noqa: F811
-    def __init__(self):
-        pass
-
-
-class ConnectivityManager(
-    metaclass=JavaClassDef, jvm_name="android/net/ConnectivityManager"
-):
-    def __init__(self):
-        pass
-
-    @java_method_def(
-        name="getActiveNetworkInfo",
-        signature="()Landroid/net/NetworkInfo;",
-        native=False,
-    )
-    def getActiveNetworkInfo(self, *args, **kwargs):
-        # IMEI
-        # FIXME 读配置文件
-        return NetworkInfo()

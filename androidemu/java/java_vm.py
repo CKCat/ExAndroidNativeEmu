@@ -1,7 +1,7 @@
 from loguru import logger
 
 from .helpers.native_method import native_method
-from .jni_const import JNI_OK
+from ..const.jni_const import JNI_OK
 from .jni_env import JNIEnv
 
 
@@ -53,7 +53,10 @@ class JavaVM:
 
     @native_method
     def detach_current_thread(self, mu, java_vm):
-        # TODO: NooOO idea.
+        # In this emulator, we treat everything as a single "main" thread context usually,
+        # or manage threads in a way that DetachCurrentThread is effectively a no-op
+        # unless we need to cleanup per-thread structures from JNIEnv map.
+        # For now, just logging is sufficient.
         logger.debug(f"JavaVM->DetachCurrentThread(0x{java_vm:08x})")
         return JNI_OK
 

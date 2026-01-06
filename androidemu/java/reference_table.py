@@ -35,18 +35,23 @@ class ReferenceTable:
         return index
 
     def remove(self, obj):
-        # TODO: Test
         index = None
-        for i in range(self._start, self._start + len(self._table)):
-            if self._table[i] is obj:
-                index = i
+        for idx, item in self._table.items():
+            if item is obj:
+                index = idx
                 break
 
         if index is None:
             return False
 
-        self._table[index] = None
+        del self._table[index]
         return True
+
+    def remove_by_id(self, idx):
+        if idx in self._table:
+            del self._table[idx]
+            return True
+        return False
 
     def get(self, idx):
         if idx not in self._table:

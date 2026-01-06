@@ -1,27 +1,23 @@
-import posixpath
+import os
 import sys
 import unittest
 
 from loguru import logger
-from unicorn import UcError
+from unicorn import UcError, UC_HOOK_CODE
+from unicorn.arm_const import UC_ARM_REG_PC
+from unicorn.arm64_const import UC_ARM64_REG_PC
 
 from androidemu.const import emu_const
 from androidemu.emulator import Emulator
-from androidemu.java.classes.activity_thread import *
-from androidemu.java.classes.array import *
-from androidemu.java.classes.context import *
-from androidemu.java.classes.map import *
+from androidemu.java.classes.activity_thread import ActivityThread
+from androidemu.java.classes.context import Context
 from androidemu.java.classes.string import String
-from androidemu.java.classes.types import *
-from androidemu.java.constant_values import *
 from androidemu.java.java_class_def import JavaClassDef
 from androidemu.java.java_method_def import java_method_def
 from androidemu.utils import memory_helpers
 
 
-class TestClass(
-    metaclass=JavaClassDef, jvm_name="com/dingxiang/demo/TestClass"
-):
+class TestClass(metaclass=JavaClassDef, jvm_name="com/dingxiang/demo/TestClass"):
     def __init__(self):
         pass
 
@@ -41,10 +37,10 @@ class TestClass(
 class TestNative(unittest.TestCase):
     def test_something(self):
         # Initialize emulator
-        emulator = Emulator(vfp_inst_set=True, vfs_root="vfs")
+        emulator = Emulator(vfp_inst_set=True, vfs_root="androidemu/data/vfs")
 
         module = emulator.load_library(
-            posixpath.join(posixpath.dirname(__file__), "bin", "test_native.so")
+            os.path.join(os.path.dirname(__file__), "bin", "test_native.so")
         )
 
         self.assertTrue(module.base != 0)
@@ -57,9 +53,7 @@ class TestNative(unittest.TestCase):
             0x00,
             String("Hello"),
         )
-        pystr = emulator.java_vm.jni_env.get_local_reference(
-            res
-        ).value.get_py_string()
+        pystr = emulator.java_vm.jni_env.get_local_reference(res).value.get_py_string()
         self.assertEqual(pystr, "Hello")
 
     def __test_tls_common(self, emulator, libcm):
@@ -85,9 +79,9 @@ class TestNative(unittest.TestCase):
 
     def test_tls32(self):
         try:
-            emulator = Emulator(vfs_root="vfs")
+            emulator = Emulator(vfs_root="androidemu/data/vfs")
             # 测试getenv，pthread_getspecific等涉及tls_init的代码是否正常
-            libcm = emulator.load_library("vfs/system/lib/libc.so")
+            libcm = emulator.load_library("androidemu/data/vfs/system/lib/libc.so")
             self.__test_tls_common(emulator, libcm)
         except UcError:
             logger.debug(f"Exit at 0x{emulator.mu.reg_read(UC_ARM_REG_PC):08X}")
@@ -96,24 +90,24 @@ class TestNative(unittest.TestCase):
 
     def test_tls64(self):
         try:
-            emulator = Emulator(vfs_root="vfs", arch=emu_const.ARCH_ARM64)
+            emulator = Emulator(
+                vfs_root="androidemu/data/vfs", arch=emu_const.ARCH_ARM64
+            )
             # 测试getenv，pthread_getspecific等涉及tls_init的代码是否正常
-            libcm = emulator.load_library("vfs/system/lib64/libc.so")
+            libcm = emulator.load_library("androidemu/data/vfs/system/lib64/libc.so")
             self.__test_tls_common(emulator, libcm)
         except UcError:
-            logger.debug(
-                f"Exit at 0x{emulator.mu.reg_read(UC_ARM64_REG_PC):08X}"
-            )
+            logger.debug(f"Exit at 0x{emulator.mu.reg_read(UC_ARM64_REG_PC):08X}")
             emulator.memory.dump_maps(sys.stdout)
             raise
 
     def test_64_elf(self):
         # Initialize emulator
-        emulator = Emulator(vfs_root="vfs", arch=emu_const.ARCH_ARM64)
+        emulator = Emulator(vfs_root="androidemu/data/vfs", arch=emu_const.ARCH_ARM64)
         emulator.java_classloader.add_class(TestClass)
 
         try:
-            libcm = emulator.load_library("vfs/system/lib64/libc.so")
+            emulator.load_library("androidemu/data/vfs/system/lib64/libc.so")
             libtest = emulator.load_library("tests/bin64/libnative-lib.so")
             # emulator.memory.dump_maps(sys.stdout)
             emulator.call_symbol(
@@ -128,24 +122,20 @@ class TestNative(unittest.TestCase):
             # emulator.memory.dump_maps(sys.stdout)
 
         except UcError:
-            logger.debug(
-                f"Exit at 0x{emulator.mu.reg_read(UC_ARM64_REG_PC):08X}"
-            )
+            logger.debug(f"Exit at 0x{emulator.mu.reg_read(UC_ARM64_REG_PC):08X}")
             emulator.memory.dump_maps(sys.stdout)
             raise
 
     def test_load_bias_new_delete(self):
-        emulator = Emulator(vfs_root="vfs", arch=emu_const.ARCH_ARM64)
+        emulator = Emulator(vfs_root="androidemu/data/vfs", arch=emu_const.ARCH_ARM64)
         try:
-            libcpp = emulator.load_library("vfs/system/lib64/libc++.so")
+            libcpp = emulator.load_library("androidemu/data/vfs/system/lib64/libc++.so")
             new_ptr = emulator.call_symbol(libcpp, "_Znwm", 100)
             emulator.mu.mem_write(new_ptr, b"hello world...")
             self.assertTrue(new_ptr != 0)
             emulator.call_symbol(libcpp, "_ZdlPv", new_ptr)
 
         except UcError:
-            logger.debug(
-                f"Exit at 0x{emulator.mu.reg_read(UC_ARM64_REG_PC):08X}"
-            )
+            logger.debug(f"Exit at 0x{emulator.mu.reg_read(UC_ARM64_REG_PC):08X}")
             emulator.memory.dump_maps(sys.stdout)
             raise

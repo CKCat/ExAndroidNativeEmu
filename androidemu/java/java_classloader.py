@@ -6,6 +6,7 @@ class JavaClassLoader(metaclass=JavaClassDef, jvm_name="java/lang/ClassLoader"):
     def __init__(self):
         self.class_by_id = dict()  # jvm_id -> JavaClassDef
         self.class_by_name = dict()  # jvm_name -> JavaClassDef
+        self.class_object_map = dict()  # JavaClassDef -> Class (mirror object)
 
     def add_class(self, clazz):
         if not isinstance(clazz, JavaClassDef):
@@ -14,12 +15,21 @@ class JavaClassLoader(metaclass=JavaClassDef, jvm_name="java/lang/ClassLoader"):
         if clazz.jvm_name in self.class_by_name:
             raise KeyError("The class '%s' is already registered." % clazz.jvm_name)
 
-        if clazz.class_object is None:
-            # FIXME 两个emulaotr add_class是同一个class 实例,会互相影响
-            clazz.class_object = Class(clazz, self)
+        if clazz not in self.class_object_map:
+            # Create the Class mirror object for this loader context
+            self.class_object_map[clazz] = Class(clazz, self)
+
+        # Ensure the definition class has a reference to its mirror class object
+        # This is needed by java_method_def native wrappers to handle 'jclass' argument for static methods
+        clazz.class_object = self.class_object_map[clazz]
 
         self.class_by_id[clazz.jvm_id] = clazz
         self.class_by_name[clazz.jvm_name] = clazz
+
+    def get_class_object(self, clazz):
+        if clazz in self.class_object_map:
+            return self.class_object_map[clazz]
+        return None
 
     def find_class_by_id(self, jvm_id):
         if jvm_id not in self.class_by_id:

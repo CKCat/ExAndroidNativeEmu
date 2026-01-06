@@ -80,3 +80,13 @@ AT_BASE_PLATFORM = 24
 AT_RANDOM = 25
 AT_HWCAP2 = 26
 AT_EXECFN = 31
+
+# Signal Block Actions
+SIG_BLOCK = 0
+SIG_UNBLOCK = 1
+SIG_SETMASK = 2
+
+# prctl options
+PR_SET_NAME = 15
+PR_GET_NAME = 16
+PR_SET_VMA = 0x53564D41  # Set VMA name, Android specific

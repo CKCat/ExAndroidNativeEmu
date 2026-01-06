@@ -1,4 +1,3 @@
-
 # Created by https://www.gitignore.io/api/venv,macos,python,windows,pycharm+all
 # Edit at https://www.gitignore.io/?templates=venv,macos,python,windows,pycharm+all
 
@@ -90,9 +89,9 @@ atlassian-ide-plugin.xml
 
 # Crashlytics plugin (for Android Studio and IntelliJ)
 com_crashlytics_export_strings.xml
-crashlytics.properties
-crashlytics-build.properties
-fabric.properties
+.crashlytics.properties
+.crashlytics-build.properties
+.fabric.properties
 
 # Editor-based Rest Client
 .idea/httpRequests
@@ -130,8 +129,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
 parts/
 sdist/
 var/
@@ -242,11 +239,7 @@ dmypy.json
 ### venv ###
 # Virtualenv
 # http://iamzed.com/2009/05/07/a-primer-on-virtualenv/
-[Bb]in
-[Ii]nclude
-[Ll]ib
-[Ll]ib64
-[Ll]ocal
+
 [Ss]cripts
 pyvenv.cfg
 pip-selfcheck.json

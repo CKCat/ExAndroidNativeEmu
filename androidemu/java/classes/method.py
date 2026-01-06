@@ -1,6 +1,6 @@
 from loguru import logger
 
-from ..constant_values import JAVA_NULL
+from ...const.java_const import JAVA_NULL
 from ..java_class_def import JavaClassDef
 from ..java_field_def import JavaFieldDef
 from ..java_method_def import JavaMethodDef, java_method_def
@@ -22,6 +22,9 @@ class Method(
         self.slot = pymethod.jvm_id
         self.declaringClass = pydeclaringClass
         self.accessFlags = pymethod.modifier
+
+    def get_method_id(self):
+        return self._method.jvm_id
 
     @staticmethod
     @java_method_def(
@@ -53,20 +56,37 @@ class Method(
     def invoke(self, emu, obj, args):
         logger.debug("Method.invoke(%r, %r)" % (obj, args))
 
+        py_args = []
+        if args and args != JAVA_NULL:
+            if hasattr(args, "get_py_items"):
+                py_args = args.get_py_items()
+            else:
+                logger.warning(f"Method.invoke args is not array: {args}")
+
         if obj == JAVA_NULL:
             # static method
-            v = self._method.func(emu, *args)
+            v = self._method.func(emu, *py_args)
 
         else:
-            v = self._method.func(obj, emu, *args)
+            v = self._method.func(obj, emu, *py_args)
 
         return v
 
+    @java_method_def(name="getName", signature="()Ljava/lang/String;", native=False)
+    def getName(self, emu):
+        from .string import String
+
+        return String(self._method.name)
+
+    @java_method_def(name="getModifiers", signature="()I", native=False)
+    def getModifiers(self, emu):
+        return self._method.modifier
+
     @java_method_def(
-        name="setAccessible", signature="(Z)V", args_list=["jboolean"]
+        name="getDeclaringClass", signature="()Ljava/lang/Class;", native=False
     )
-    def setAccessible(self, emu, flag):
-        pass
+    def getDeclaringClass(self, emu):
+        return self.declaringClass.class_object
 
     def __repr__(self):
         return "Method(%s, %s)" % (self.declaringClass, self._method)

@@ -19,3 +19,20 @@ PR_SET_NAME = 15  # /* Set process name */
 PR_GET_NAME = 16  # /* Get process name */
 
 PR_SET_VMA = 0x53564D41
+
+DEFAULT_ENV = {
+    "ANDROID_DATA": "/data",
+    "MKSH": "/system/bin/sh",
+    "HOME": "/data",
+    "USER": "shell",
+    "ANDROID_ROOT": "/system",
+    "SHELL": "/system/bin/sh",
+    "ANDROID_BOOTLOGO": "1",
+    "TMPDIR": "/data/local/tmp",
+    "ANDROID_ASSETS": "/system/app",
+    "HOSTNAME": "bullhead",
+    "EXTERNAL_STORAGE": "/sdcard",
+    "ANDROID_STORAGE": "/storage",
+}
+
+DEFAULT_ARGV = ["app_process32"]
